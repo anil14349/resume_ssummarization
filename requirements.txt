@@ -1,0 +1,7 @@
+pyPDF2
+python-docx==0.8.11
+torch==2.1.1
+transformers==4.35.2
+sentencepiece==0.1.99
+gradio==4.8.0
+streamlit==1.29.0
