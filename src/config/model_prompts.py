@@ -8,12 +8,13 @@ SUMMARY_TEMPLATES = {
     'role': "I am a {current_role} with {years_experience} years of experience at {companies}",
     'experience': "My key achievements include {achievements}",
     'skills': "I am skilled in {skills}",
-    'education': "and hold {education}"
+    'education': "and hold {education}",
+    'recognition': "I have also been recognized as {recognition}" if "{recognition}" else ""
 }
 
 # Model-specific prompts that use the templates
 T5_PROMPT = """
-{role}. {skills}. {experience}.
+{greeting} and {role}. {skills}. {experience}.
 """
 
 GPT2_PROMPT = """
@@ -21,5 +22,5 @@ GPT2_PROMPT = """
 """
 
 BART_PROMPT = """
-{greeting} and {role}. {skills} {education}. {experience}. I have also been recognized as one of the top restaurant managers in our area.
+{greeting} and {role}. {skills} {education}. {experience}. {recognition}
 """

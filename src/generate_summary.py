@@ -6,7 +6,7 @@ def main():
     input_data = {
         'name': 'May Riley',
         'current_role': 'Restaurant Manager',
-        'years_experience': 5,  # Added years of experience
+        'years_experience': 5,
         'companies': [
             'Contoso Bar and Grill',
             'Fourth Coffee Bistro'
@@ -23,7 +23,8 @@ def main():
         'education': [
             'B.S. in Business Administration',
             'A.A. in Hospitality Management'
-        ]
+        ],
+        'recognition': 'one of the top restaurant managers in our area'
     }
 
     # Initialize model factory
