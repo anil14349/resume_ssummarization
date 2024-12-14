@@ -14,7 +14,7 @@ SUMMARY_TEMPLATES = {
 
 # Model-specific prompts that use the templates
 T5_PROMPT = """
-{greeting} and {role}. {skills}. {experience}.
+{greeting} and {role}. {skills} {education}. {experience}
 """
 
 GPT2_PROMPT = """

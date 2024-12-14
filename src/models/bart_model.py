@@ -11,8 +11,18 @@ class BartResumeModel(BaseResumeModel):
         if model_name != "facebook/bart-large":
             self.config['model']['name'] = model_name
         
-        self.tokenizer = BartTokenizer.from_pretrained(self.config['model']['name'])
-        self.model = BartForConditionalGeneration.from_pretrained(self.config['model']['name'])
+        # Initialize tokenizer with proper settings
+        self.tokenizer = BartTokenizer.from_pretrained(
+            self.config['model']['name'],
+            model_max_length=1024,
+            force_download=True
+        )
+        
+        # Initialize model
+        self.model = BartForConditionalGeneration.from_pretrained(
+            self.config['model']['name'],
+            force_download=True
+        )
     
     def generate_prompt(self, formatted_data):
         """Generate a prompt using the template strings."""
@@ -33,8 +43,9 @@ class BartResumeModel(BaseResumeModel):
             inputs = self.tokenizer.encode(
                 input_text, 
                 return_tensors="pt", 
-                max_length=512, 
-                truncation=True
+                max_length=1024,
+                truncation=True,
+                padding='max_length'
             )
             
             # Generate summary

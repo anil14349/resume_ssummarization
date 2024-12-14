@@ -11,14 +11,28 @@ class GPT2ResumeModel(BaseResumeModel):
         if model_name != "gpt2-medium":
             self.config['model']['name'] = model_name
         
-        # Initialize tokenizer and model
-        self.tokenizer = GPT2Tokenizer.from_pretrained(self.config['model']['name'])
-        self.model = GPT2LMHeadModel.from_pretrained(self.config['model']['name'])
+        # Initialize tokenizer with proper settings
+        self.tokenizer = GPT2Tokenizer.from_pretrained(
+            self.config['model']['name'],
+            force_download=True,
+            padding_side='left'  # Set padding side to left for decoder-only model
+        )
         
-        # GPT2 doesn't have a padding token by default
+        # Initialize model
+        self.model = GPT2LMHeadModel.from_pretrained(
+            self.config['model']['name'],
+            force_download=True
+        )
+        
+        # Set pad token and update generation params
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.config['model']['generation_params']['pad_token_id'] = self.model.config.eos_token_id
-        
+        self.model.config.pad_token_id = self.model.config.eos_token_id
+        self.config['model']['generation_params'].update({
+            'max_new_tokens': 200,  # Control output length
+            'pad_token_id': self.model.config.eos_token_id,
+            'max_length': None  # Let max_new_tokens control the length
+        })
+    
     def generate_prompt(self, formatted_data):
         """Generate a prompt using the template strings."""
         template_data = self.format_template_data(formatted_data)
@@ -26,7 +40,7 @@ class GPT2ResumeModel(BaseResumeModel):
         return GPT2_PROMPT.format(**templates)
     
     def generate_summary(self, input_json):
-        """Generate a professional summary using GPT-2 model."""
+        """Generate a professional summary using GPT2 model."""
         try:
             # Format input data
             formatted_data = self.format_input_data(input_json)
@@ -37,9 +51,9 @@ class GPT2ResumeModel(BaseResumeModel):
             # Tokenize input
             inputs = self.tokenizer.encode(
                 input_text, 
-                return_tensors="pt", 
-                max_length=512, 
-                truncation=True
+                return_tensors="pt",
+                truncation=True,
+                max_length=512  # Limit input length
             )
             
             # Generate summary
