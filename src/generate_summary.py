@@ -2,6 +2,9 @@ from models.model_factory import ResumeModelFactory
 from datetime import datetime
 import sys
 
+from src.parsers.ats_parser import ATSParser as ATSParser
+from src.parsers.industry_manager_parser import IndustryManagerParser as IndustryManagerParser
+
 def get_available_models():
     """Return a list of available models and their descriptions."""
     return {
@@ -118,6 +121,13 @@ def main():
     print("This tool helps generate professional summaries using different AI models.")
     print("Each model has its own strengths and characteristics.")
     
+
+    #ats_resume_path = '/Users/anilkumar/Desktop/tv3/src/templates/ATS classic HR resume.docx'
+    #input_data = ATSParser(ats_resume_path).parse_docx_to_json()
+    
+    industry_manager_resume_path = '/Users/anilkumar/Desktop/tv3/src/templates/Industry manager resume.docx'
+    input_data = IndustryManagerParser(industry_manager_resume_path).parse_docx_to_json()
+
     # Initialize model factory
     factory = ResumeModelFactory()
 

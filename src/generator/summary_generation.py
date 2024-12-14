@@ -1,6 +1,10 @@
 import json
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 import torch
+import ATSParser as ats_parser
+import IndustryManagerParser as ind_parser
+
+from src.parsers.ats_parser import ATSParser
 
 def format_input_text(input_json):
     """Format the resume data into a structured text for the model."""
@@ -152,6 +156,7 @@ if __name__ == "__main__":
         ]
     }
     
+    #input_json  = ATSParser('src/templates/ATS classic HR resume.docx').parse_docx_to_json()
     # Generate and print summary
     print("Generating professional summary (this may take a moment)...")
     summary = generate_summary(input_json)
