@@ -64,6 +64,5 @@ logs/
 *.h5
 *.model
 *.bin
-models/
 *.csv
 *.json

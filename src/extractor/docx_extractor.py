@@ -3,7 +3,7 @@ from docx import Document
 import sys
 import os
 import re
-from base_resume_parser import BaseResumeParser
+from .base_resume_parser import BaseResumeParser
 from typing import Optional
 
 class DocumentParser():
