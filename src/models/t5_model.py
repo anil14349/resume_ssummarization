@@ -5,7 +5,7 @@ from config.model_config import T5_CONFIG
 from config.model_prompts import T5_PROMPT, SUMMARY_TEMPLATES
 
 class T5ResumeModel(BaseResumeModel):
-    def __init__(self, model_name="t5-base"):
+    def __init__(self, model_name="t5-base", cache_dir=None):
         super().__init__()
         self.config.update(T5_CONFIG)
         if model_name != "t5-base":
@@ -16,12 +16,15 @@ class T5ResumeModel(BaseResumeModel):
             self.config['model']['name'],
             model_max_length=1024,  # Set appropriate max length
             legacy=False,  # Use new behavior
+            cache_dir=cache_dir,
+            local_files_only=cache_dir is not None
         )
         
         # Initialize model with force_download=True to avoid deprecated warning
         self.model = T5ForConditionalGeneration.from_pretrained(
             self.config['model']['name'],
-            force_download=True
+            cache_dir=cache_dir,
+            local_files_only=cache_dir is not None
         )
     
     def format_template_data(self, formatted_data):

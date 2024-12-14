@@ -5,23 +5,22 @@ from config.model_config import GPT2_CONFIG
 from config.model_prompts import GPT2_PROMPT, SUMMARY_TEMPLATES
 
 class GPT2ResumeModel(BaseResumeModel):
-    def __init__(self, model_name="gpt2-medium"):
+    def __init__(self, model_name="gpt2", cache_dir=None):
         super().__init__()
         self.config.update(GPT2_CONFIG)
-        if model_name != "gpt2-medium":
+        if model_name != "gpt2":
             self.config['model']['name'] = model_name
         
-        # Initialize tokenizer with proper settings
+        # Initialize tokenizer and model with caching
         self.tokenizer = GPT2Tokenizer.from_pretrained(
             self.config['model']['name'],
-            force_download=True,
-            padding_side='left'  # Set padding side to left for decoder-only model
+            cache_dir=cache_dir,
+            local_files_only=cache_dir is not None
         )
-        
-        # Initialize model
         self.model = GPT2LMHeadModel.from_pretrained(
             self.config['model']['name'],
-            force_download=True
+            cache_dir=cache_dir,
+            local_files_only=cache_dir is not None
         )
         
         # Set pad token and update generation params

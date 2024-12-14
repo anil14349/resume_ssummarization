@@ -5,23 +5,27 @@ from config.model_config import BART_CONFIG
 from config.model_prompts import BART_PROMPT, SUMMARY_TEMPLATES
 
 class BartResumeModel(BaseResumeModel):
-    def __init__(self, model_name="facebook/bart-large"):
+    def __init__(self, model_name="facebook/bart-base", cache_dir=None):
         super().__init__()
         self.config.update(BART_CONFIG)
-        if model_name != "facebook/bart-large":
+        if model_name != "facebook/bart-base":
             self.config['model']['name'] = model_name
         
-        # Initialize tokenizer with proper settings
+        # Initialize tokenizer and model with caching
         self.tokenizer = BartTokenizer.from_pretrained(
             self.config['model']['name'],
+            cache_dir=cache_dir,
+            local_files_only=cache_dir is not None,
             model_max_length=1024,
-            force_download=True
+            force_download=False,
+            legacy=False,
         )
         
-        # Initialize model
         self.model = BartForConditionalGeneration.from_pretrained(
             self.config['model']['name'],
-            force_download=True
+            cache_dir=cache_dir,
+            local_files_only=cache_dir is not None,
+            force_download=False
         )
     
     def generate_prompt(self, formatted_data):

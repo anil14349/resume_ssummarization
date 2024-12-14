@@ -1,46 +1,93 @@
 from models.model_factory import ResumeModelFactory
 from datetime import datetime
-import argparse
+import sys
 
 def get_available_models():
     """Return a list of available models and their descriptions."""
     return {
-        "t5-base": "T5 model - Good at following structured prompts",
-        "gpt2-medium": "GPT-2 model - Natural language generation",
-        "bart-large": "BART model - Good at both understanding and generation"
+        "t5-base": {
+            "description": "T5 model - Good at following structured prompts",
+            "strengths": ["Follows templates well", "Good at structured tasks", "Fast generation"],
+            "best_for": "Professional, template-based summaries"
+        },
+        "gpt2-medium": {
+            "description": "GPT-2 model - Natural language generation",
+            "strengths": ["Natural writing style", "Creative outputs", "Good context understanding"],
+            "best_for": "Natural-sounding, creative summaries"
+        },
+        "bart-large": {
+            "description": "BART model - Good at both understanding and generation",
+            "strengths": ["Balanced performance", "Good comprehension", "Reliable outputs"],
+            "best_for": "Well-balanced, comprehensive summaries"
+        }
     }
 
+def display_model_info(model_info):
+    """Display detailed information about a model."""
+    print(f"\nModel Details:")
+    print("-" * 50)
+    print(f"Description: {model_info['description']}")
+    print("\nStrengths:")
+    for strength in model_info['strengths']:
+        print(f"  • {strength}")
+    print(f"\nBest for: {model_info['best_for']}")
+
 def select_model():
-    """Interactive model selection."""
+    """Interactive model selection with detailed information."""
     available_models = get_available_models()
     
-    print("\nAvailable models:")
-    print("-" * 50)
-    for i, (model_name, description) in enumerate(available_models.items(), 1):
-        print(f"{i}. {model_name}: {description}")
-    
     while True:
+        print("\nAvailable Models:")
+        print("-" * 50)
+        for i, (model_name, info) in enumerate(available_models.items(), 1):
+            print(f"{i}. {model_name}: {info['description']}")
+        print("\nOptions:")
+        print("  • Enter model number (1-3) to select a model")
+        print("  • Enter 'i' followed by model number for more info (e.g., 'i1')")
+        print("  • Enter 'a' to try all models")
+        print("  • Enter 'q' to quit")
+        
+        choice = input("\nYour choice: ").strip().lower()
+        
+        if choice == 'q':
+            print("\nExiting program.")
+            sys.exit(0)
+        
+        if choice == 'a':
+            return None
+        
+        if choice.startswith('i'):
+            try:
+                model_num = int(choice[1:]) - 1
+                if 0 <= model_num < len(available_models):
+                    model_info = list(available_models.values())[model_num]
+                    display_model_info(model_info)
+                    input("\nPress Enter to continue...")
+                else:
+                    print(f"Please enter a number between 1 and {len(available_models)}")
+            except ValueError:
+                print("Invalid input. Please try again.")
+            continue
+        
         try:
-            choice = input("\nSelect a model (1-3) or press Enter to try all models: ").strip()
-            if not choice:  # Empty input - try all models
-                return None
-            
             choice = int(choice)
             if 1 <= choice <= len(available_models):
                 selected_model = list(available_models.keys())[choice - 1]
                 model_type, model_size = selected_model.split('-')
-                return [(model_type, model_size)]
+                
+                # Display selected model info
+                print(f"\nSelected: {selected_model}")
+                display_model_info(available_models[selected_model])
+                
+                confirm = input("\nProceed with this model? (y/n): ").strip().lower()
+                if confirm == 'y':
+                    return [(model_type, model_size)]
             else:
                 print(f"Please enter a number between 1 and {len(available_models)}")
         except ValueError:
-            print("Please enter a valid number")
+            print("Invalid input. Please try again.")
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate professional summaries using different models.')
-    parser.add_argument('--model', choices=['t5-base', 'gpt2-medium', 'bart-large'], 
-                       help='Specific model to use (optional)')
-    args = parser.parse_args()
-
     # Example input data
     input_data = {
         'name': 'May Riley',
@@ -66,25 +113,26 @@ def main():
         'recognition': 'one of the top restaurant managers in our area'
     }
 
+    print("\nProfessional Summary Generator")
+    print("=" * 50)
+    print("This tool helps generate professional summaries using different AI models.")
+    print("Each model has its own strengths and characteristics.")
+    
     # Initialize model factory
     factory = ResumeModelFactory()
 
-    # Determine which models to use
-    if args.model:
-        model_type, model_size = args.model.split('-')
-        model_configs = [(model_type, model_size)]
-    else:
-        model_configs = select_model()
-        if model_configs is None:  # Try all models
-            model_configs = [
-                ("t5", "base"),
-                ("gpt2", "medium"),
-                ("bart", "large")
-            ]
+    # Get model selection from user
+    model_configs = select_model()
+    if model_configs is None:  # Try all models
+        model_configs = [
+            ("t5", "base"),
+            ("gpt2", "medium"),
+            ("bart", "large")
+        ]
     
     # Generate summaries
     for model_type, model_size in model_configs:
-        print(f"\nTrying {model_type.upper()}-{model_size} model:")
+        print(f"\nUsing {model_type.upper()}-{model_size} model:")
         print("-" * 50)
         print("Generating summary (this may take a moment)...")
         
@@ -94,6 +142,13 @@ def main():
             print(f"\nGenerated Professional Summary:\n{summary}")
         except Exception as e:
             print(f"Error with {model_type}-{model_size} model: {e}")
+        
+        if len(model_configs) > 1:
+            input("\nPress Enter to continue to the next model...")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\nProgram terminated by user.")
+        sys.exit(0)
