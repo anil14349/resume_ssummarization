@@ -72,7 +72,7 @@ class BaseResumeModel(ABC):
     def format_input_data(self, input_json):
         """Format input data for summary generation."""
         # Ensure all required fields are present
-        required_fields = ['name', 'current_role', 'companies', 'achievements', 'skills', 'education']
+        required_fields = ['name', 'current_role', 'years_experience', 'companies', 'achievements', 'skills', 'education']
         for field in required_fields:
             if field not in input_json:
                 raise ValueError(f"Missing required field: {field}")
@@ -85,7 +85,8 @@ class BaseResumeModel(ABC):
             'achievements': input_json['achievements'][:self.config['formatting']['max_achievements']],
             'skills': [s for s in input_json['skills'][:self.config['formatting']['max_skills']] 
                       if s.lower() not in self.config['formatting']['skill_exclusions']],
-            'education': input_json['education'][:2]  # Limit to top 2 education entries
+            'education': input_json['education'][:2],  # Limit to top 2 education entries
+            'years_experience': input_json['years_experience']
         }
         
         return formatted_data
@@ -97,6 +98,11 @@ class BaseResumeModel(ABC):
         template_data['achievements'] = ', '.join(template_data['achievements'])
         template_data['skills'] = ', '.join(template_data['skills'])
         template_data['education'] = ', '.join(template_data['education'])
+        
+        # Ensure years_experience is an integer
+        if 'years_experience' in template_data:
+            template_data['years_experience'] = int(template_data['years_experience'])
+        
         return template_data
     
     def clean_output(self, summary):

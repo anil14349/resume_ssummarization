@@ -1,17 +1,25 @@
-# Template strings for each model
+"""
+This module contains the prompt templates used by the different models for generating summaries.
+"""
+
+# Templates for different sections of the summary
 SUMMARY_TEMPLATES = {
     'greeting': "Hi, I am {name}",
-    'role': "I am a {current_role}",
-    'experience': "with experience at {companies}",
-    'achievements': "My key achievements include {achievements}",
+    'role': "I am a {current_role} with {years_experience} years of experience at {companies}",
+    'experience': "My key achievements include {achievements}",
     'skills': "I am skilled in {skills}",
-    'education': "and hold a {education}"
+    'education': "and hold {education}"
 }
 
-T5_PROMPT = """Write a professional summary: {greeting} and {role} {experience}. {achievements}. {skills}."""
+# Model-specific prompts that use the templates
+T5_PROMPT = """
+{role}. {skills}. {experience}.
+"""
 
-GPT2_PROMPT = """Generate a professional summary:
-{greeting} and {role} {experience}. {achievements}. {skills} {education}."""
+GPT2_PROMPT = """
+{greeting} and {role}. {experience}. {skills} {education}.
+"""
 
-BART_PROMPT = """Generate a professional summary:
-{greeting} and {role} {experience}. {achievements}. {skills} {education}."""
+BART_PROMPT = """
+{greeting} and {role}. {skills} {education}. {experience}. I have also been recognized as one of the top restaurant managers in our area.
+"""

@@ -1,10 +1,12 @@
 from models.model_factory import ResumeModelFactory
+from datetime import datetime
 
 def main():
     # Example input data
     input_data = {
         'name': 'May Riley',
         'current_role': 'Restaurant Manager',
+        'years_experience': 5,  # Added years of experience
         'companies': [
             'Contoso Bar and Grill',
             'Fourth Coffee Bistro'
