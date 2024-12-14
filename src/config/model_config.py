@@ -1,15 +1,21 @@
-"""Configuration file for model parameters."""
+"""
+This module contains the configuration for different models.
+"""
 
 T5_CONFIG = {
     'model': {
         'name': 't5-base',
         'generation_params': {
-            'max_length': 150,
-            'min_length': 50,
-            'num_beams': 4,
-            'length_penalty': 1.0,
+            'max_length': 200,
+            'min_length': 100,
+            'num_beams': 5,
+            'length_penalty': 1.5,
+            'early_stopping': True,
             'no_repeat_ngram_size': 3,
-            'early_stopping': True
+            'num_beam_groups': 5,
+            'diversity_penalty': 0.5,
+            'repetition_penalty': 1.2,
+            'do_sample': False
         }
     }
 }
@@ -18,13 +24,14 @@ GPT2_CONFIG = {
     'model': {
         'name': 'gpt2-medium',
         'generation_params': {
-            'max_length': 200,
-            'min_length': 50,
-            'num_beams': 4,
-            'length_penalty': 1.0,
-            'no_repeat_ngram_size': 3,
+            'max_new_tokens': 150,
+            'num_beams': 5,
+            'length_penalty': 1.2,
             'early_stopping': True,
-            'pad_token_id': 50256
+            'no_repeat_ngram_size': 3,
+            'do_sample': True,
+            'temperature': 0.6,
+            'top_p': 0.9
         }
     }
 }
@@ -34,13 +41,14 @@ BART_CONFIG = {
         'name': 'facebook/bart-large',
         'generation_params': {
             'max_length': 150,
-            'min_length': 50,
             'num_beams': 5,
-            'length_penalty': 0.6,
-            'no_repeat_ngram_size': 3,
+            'length_penalty': 1.2,
             'early_stopping': True,
-            'repetition_penalty': 1.3,
-            'do_sample': False
+            'no_repeat_ngram_size': 3,
+            'do_sample': True,
+            'temperature': 0.6,
+            'top_p': 0.9,
+            'repetition_penalty': 1.2
         }
     }
 }
