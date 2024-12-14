@@ -1,40 +1,50 @@
 from models.model_factory import ResumeModelFactory
-from extractor.docx_extractor import DocumentParser
-import json
-import os
 
 def main():
-    # Get the directory where the script is located
-    resume_path = 'data/Industry manager resume 1.docx'
+    # Example input data
+    input_data = {
+        'name': 'May Riley',
+        'current_role': 'Restaurant Manager',
+        'companies': [
+            'Contoso Bar and Grill',
+            'Fourth Coffee Bistro'
+        ],
+        'achievements': [
+            'reduced costs by 7% via controls on overtime, operational efficiencies, and reduced waste',
+            'consistently exceed monthly sales goals by a least 10% by training FOH staff on upselling techniques via a featured food and beverage program'
+        ],
+        'skills': [
+            'Accounting & Budgeting',
+            'Proficient with POS systems',
+            'Excellent interpersonal and communication skills'
+        ],
+        'education': [
+            'B.S. in Business Administration',
+            'A.A. in Hospitality Management'
+        ]
+    }
 
-    # Initialize the document parser
-    doc_parser = DocumentParser()
-    input_json = doc_parser.extract_docx_text(resume_path)
+    # Initialize model factory
+    factory = ResumeModelFactory()
 
-    # Try each model type
+    # Try each model
     model_configs = [
         ("t5", "base"),
         ("gpt2", "medium"),
         ("bart", "large")
     ]
-
+    
     for model_type, model_size in model_configs:
         print(f"\nTrying {model_type.upper()}-{model_size} model:")
         print("-" * 50)
+        print("Generating summary (this may take a moment)...")
         
         try:
-            # Create model
-            model = ResumeModelFactory.create_model(model_type, model_size)
-            
-            # Generate summary
-            print("Generating summary (this may take a moment)...")
-            summary = model.generate_summary(input_json)
-            
-            print("\nGenerated Professional Summary:")
-            print(summary)
-            
+            model = factory.create_model(model_type, model_size)
+            summary = model.generate_summary(input_data)
+            print(f"\nGenerated Professional Summary:\n{summary}")
         except Exception as e:
-            print(f"Error with {model_type}-{model_size} model: {str(e)}")
+            print(f"Error with {model_type}-{model_size} model: {e}")
 
 if __name__ == "__main__":
     main()
