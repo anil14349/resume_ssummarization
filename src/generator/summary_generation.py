@@ -1,10 +1,8 @@
 import json
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 import torch
-import ATSParser as ats_parser
-import IndustryManagerParser as ind_parser
-
 from src.parsers.ats_parser import ATSParser
+from src.parsers.industry_manager_parser import IndustryManagerParser
 
 def format_input_text(input_json):
     """Format the resume data into a structured text for the model."""
