@@ -42,17 +42,18 @@ GPT2_CONFIG = {
     'model': {
         'name': 'gpt2-medium',
         'generation_params': {
-            'max_new_tokens': 150,      # Reduced to prevent extra content
-            'min_length': 100,          # Ensure reasonable length
-            'num_beams': 5,             # More beams for better quality
-            'length_penalty': 0.7,      # Stronger preference for shorter outputs
-            'early_stopping': True,
-            'no_repeat_ngram_size': 3,  # Prevent repetition
+            'max_new_tokens': 200,
+            'min_length': 50,
             'do_sample': True,
-            'temperature': 0.5,         # Even more conservative sampling
-            'top_p': 0.8,              # More focused sampling
-            'pad_token_id': None,       # Will be set to eos_token_id in model
-            'repetition_penalty': 1.4   # Stronger repetition penalty
+            'top_p': 0.9,
+            'top_k': 50,
+            'temperature': 0.7,
+            'num_return_sequences': 1,
+            'no_repeat_ngram_size': 2,
+            'num_beams': 3,
+            'repetition_penalty': 1.2,
+            'length_penalty': 1.0,
+            'bad_words_ids': None
         }
     }
 }
