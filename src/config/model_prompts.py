@@ -52,17 +52,16 @@ Write a concise, engaging first-person summary that emphasizes achievements and 
 """
 
 # BART-specific prompt template
-BART_PROMPT = """Generate a professional summary for this profile:
-Professional Background:
-- Current Role: {role}
-- Experience: {experience}
-- Achievements: {achievements}
+BART_PROMPT = """Generate a concise professional summary in first person:
 
-Technical Expertise:
-{skills}
+Name: {name}
+Current Role: {role} at {company}
+Experience: {experience} in HR
+Key Achievements:
+- {achievements}
 
-Education:
-{education}
+Core Skills: {skills}
+Education: {education}
 {recognition}
 
-Write a concise, professional first-person summary."""
+Begin with "Hi, I am {name}" and highlight your role, experience, and key achievements."""
