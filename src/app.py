@@ -357,7 +357,7 @@ def main():
                 """, unsafe_allow_html=True)
                 
                 # File paths
-                base_path = "/Users/anilkumar/Desktop/tv3/src/templates"
+                base_path = "src/templates"
                 template_paths = {
                     "ATS Classic HR Resume": os.path.join(base_path, "ATS classic HR resume.docx"),
                     "Industry Manager Resume": os.path.join(base_path, "Industry manager resume.docx")

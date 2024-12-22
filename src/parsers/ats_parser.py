@@ -354,7 +354,7 @@ class ATSParser:
 
 # Example usage
 if __name__ == "__main__":
-    file_path = '/Users/anilkumar/Desktop/tv3/src/templates/ATS classic HR resume.docx'
+    file_path = 'src/templates/ATS classic HR resume.docx'
     parser = ATSParser(file_path)
     parsed_data = parser.parse_docx_to_json()
     print(json.dumps(parsed_data, indent=4))

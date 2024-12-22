@@ -1,54 +1,60 @@
 """
-This module contains the configuration for different models.
+This module contains model configurations.
 """
 
-T5_CONFIG = {
-    'model': {
-        'name': 't5-base',
-        'generation_params': {
-            'max_length': 200,
-            'min_length': 100,
-            'num_beams': 5,
-            'length_penalty': 1.5,
-            'early_stopping': True,
-            'no_repeat_ngram_size': 3,
-            'num_beam_groups': 5,
-            'diversity_penalty': 0.5,
-            'repetition_penalty': 1.2,
-            'do_sample': False
-        }
-    }
-}
-
-GPT2_CONFIG = {
-    'model': {
-        'name': 'gpt2-medium',
-        'generation_params': {
-            'max_new_tokens': 150,
-            'num_beams': 5,
-            'length_penalty': 1.2,
-            'early_stopping': True,
-            'no_repeat_ngram_size': 3,
-            'do_sample': True,
-            'temperature': 0.6,
-            'top_p': 0.9
-        }
-    }
-}
-
+# BART model configuration
 BART_CONFIG = {
     'model': {
         'name': 'facebook/bart-large',
         'generation_params': {
-            'max_length': 150,
-            'num_beams': 5,
-            'length_penalty': 1.2,
+            'max_new_tokens': 200,     # Increased for complete sentences
+            'min_length': 100,         # Ensure reasonable length
+            'num_beams': 5,            # More beams for better quality
+            'length_penalty': 1.0,     # Balanced length penalty
+            'early_stopping': True,
+            'no_repeat_ngram_size': 3,
+            'do_sample': True,         # Enable sampling
+            'temperature': 0.7,        # Control randomness
+            'top_p': 0.9,             # Nucleus sampling
+            'repetition_penalty': 1.2  # Reduce repetition
+        }
+    }
+}
+
+# T5 model configuration
+T5_CONFIG = {
+    'model': {
+        'name': 't5-base',
+        'generation_params': {
+            'max_new_tokens': 150,
+            'min_length': 75,
+            'num_beams': 4,
+            'length_penalty': 1.0,
             'early_stopping': True,
             'no_repeat_ngram_size': 3,
             'do_sample': True,
-            'temperature': 0.6,
+            'temperature': 0.7,
             'top_p': 0.9,
-            'repetition_penalty': 1.2
+        }
+    }
+}
+
+# GPT2 model configuration
+GPT2_CONFIG = {
+    'model': {
+        'name': 'gpt2-medium',
+        'generation_params': {
+            'max_new_tokens': 150,      # Reduced to prevent extra content
+            'min_length': 100,          # Ensure reasonable length
+            'num_beams': 5,             # More beams for better quality
+            'length_penalty': 0.7,      # Stronger preference for shorter outputs
+            'early_stopping': True,
+            'no_repeat_ngram_size': 3,  # Prevent repetition
+            'do_sample': True,
+            'temperature': 0.5,         # Even more conservative sampling
+            'top_p': 0.8,              # More focused sampling
+            'pad_token_id': None,       # Will be set to eos_token_id in model
+            'repetition_penalty': 1.4   # Stronger repetition penalty
         }
     }
 }

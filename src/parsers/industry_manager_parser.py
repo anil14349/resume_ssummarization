@@ -221,7 +221,7 @@ class IndustryManagerParser:
 
 if __name__ == "__main__":
     import json
-    file_path = "/Users/anilkumar/Desktop/tv3/src/templates/Industry manager resume.docx"
+    file_path = "src/templates/Industry manager resume.docx"
     parser = IndustryManagerParser(file_path)
     result = parser.parse_docx_to_json()
     print(json.dumps(result, indent=4))

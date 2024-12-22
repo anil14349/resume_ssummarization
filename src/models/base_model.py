@@ -38,11 +38,11 @@ class BaseResumeModel(ABC):
             'name': input_json['name'],
             'current_role': input_json['current_role'],
             'years_experience': input_json['years_experience'],
-            'companies': input_json['companies'][:2],  # Limit to top 2 companies
-            'achievements': input_json['achievements'][:self.config['formatting']['max_achievements']],
-            'skills': [s for s in input_json['skills'][:self.config['formatting']['max_skills']] 
-                      if s.lower() not in self.config['formatting']['skill_exclusions']],
-            'education': input_json['education'][:2],  # Limit to top 2 education entries
+            'companies': ', '.join(input_json['companies'][:2]),  # Limit to top 2 companies
+            'achievements': '. '.join(input_json['achievements'][:self.config['formatting']['max_achievements']]),
+            'skills': ', '.join([s for s in input_json['skills'][:self.config['formatting']['max_skills']] 
+                      if s.lower() not in self.config['formatting']['skill_exclusions']]),
+            'education': ', '.join(input_json['education'][:2]),  # Limit to top 2 education entries
             'recognition': input_json.get('recognition', '')  # Optional recognition field
         }
         
@@ -51,12 +51,6 @@ class BaseResumeModel(ABC):
     def format_template_data(self, formatted_data):
         """Format data for template strings."""
         template_data = formatted_data.copy()
-        
-        # Convert lists to comma-separated strings
-        list_fields = ['companies', 'achievements', 'skills', 'education']
-        for field in list_fields:
-            if isinstance(template_data[field], list):
-                template_data[field] = ', '.join(template_data[field])
         
         # Ensure years_experience is an integer
         if 'years_experience' in template_data:

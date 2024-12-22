@@ -1,9 +1,11 @@
 from models.model_factory import ResumeModelFactory
 from datetime import datetime
 import sys
-
-from src.parsers.ats_parser import ATSParser as ATSParser
-from src.parsers.industry_manager_parser import IndustryManagerParser as IndustryManagerParser
+import os
+import argparse
+from rouge_score import rouge_scorer
+from parsers.ats_parser import ATSParser as ATSParser
+from parsers.industry_manager_parser import IndustryManagerParser as IndustryManagerParser
 
 def get_available_models():
     """Return a list of available models and their descriptions."""
@@ -90,71 +92,73 @@ def select_model():
         except ValueError:
             print("Invalid input. Please try again.")
 
-def main():
-    # Example input data
-    input_data = {
-        'name': 'May Riley',
-        'current_role': 'Restaurant Manager',
-        'years_experience': 5,
-        'companies': [
-            'Contoso Bar and Grill',
-            'Fourth Coffee Bistro'
-        ],
-        'achievements': [
-            'reduced costs by 7% via controls on overtime, operational efficiencies, and reduced waste',
-            'consistently exceed monthly sales goals by a least 10% by training FOH staff on upselling techniques via a featured food and beverage program'
-        ],
-        'skills': [
-            'Accounting & Budgeting',
-            'Proficient with POS systems',
-            'Excellent interpersonal and communication skills'
-        ],
-        'education': [
-            'B.S. in Business Administration',
-            'A.A. in Hospitality Management'
-        ],
-        'recognition': 'one of the top restaurant managers in our area'
-    }
+def parse_args():
+    parser = argparse.ArgumentParser(description='Professional Summary Generator')
+    parser.add_argument('input_file', help='Input resume file path')
+    parser.add_argument('--model', '-m', default='t5-base', help='Model to use (e.g., t5-base)')
+    parser.add_argument('--parser', '-p', default='ats', choices=['ats', 'industry_manager'], help='Parser type')
+    parser.add_argument('--metadata', action='store_true', help='Return metadata')
+    return parser.parse_args()
 
-    print("\nProfessional Summary Generator")
-    print("=" * 50)
-    print("This tool helps generate professional summaries using different AI models.")
-    print("Each model has its own strengths and characteristics.")
-    
-
-    #ats_resume_path = '/Users/anilkumar/Desktop/tv3/src/templates/ATS classic HR resume.docx'
-    #input_data = ATSParser(ats_resume_path).parse_docx_to_json()
-    
-    industry_manager_resume_path = '/Users/anilkumar/Desktop/tv3/src/templates/Industry manager resume.docx'
-    input_data = IndustryManagerParser(industry_manager_resume_path).parse_docx_to_json()
-
+def generate_summary(model_type, model_size, file_path, parser_type, return_metadata):
     # Initialize model factory
     factory = ResumeModelFactory()
-
-    # Get model selection from user
-    model_configs = select_model()
-    if model_configs is None:  # Try all models
-        model_configs = [
-            ("t5", "base"),
-            ("gpt2", "medium"),
-            ("bart", "large")
-        ]
     
-    # Generate summaries
-    for model_type, model_size in model_configs:
-        print(f"\nUsing {model_type.upper()}-{model_size} model:")
-        print("-" * 50)
-        print("Generating summary (this may take a moment)...")
+    # Load input data
+    if parser_type == 'ats':
+        input_data = ATSParser(file_path).parse_docx_to_json()
+    elif parser_type == 'industry_manager':
+        input_data = IndustryManagerParser(file_path).parse_docx_to_json()
+    else:
+        raise ValueError("Invalid parser type")
+    
+    # Generate summary
+    model = factory.create_model(model_type, model_size)
+    summary = model.generate_summary(input_data)
+    
+    return summary
+
+def main():
+    """Main function to run the summary generator."""
+    args = parse_args()
+    
+    if args.model:
+        model_type, model_size = args.model.split('-')
+        model_configs = [(model_type, model_size)]
+    else:
+        model_configs = select_model()
         
-        try:
-            model = factory.create_model(model_type, model_size)
-            summary = model.generate_summary(input_data)
-            print(f"\nGenerated Professional Summary:\n{summary}")
-        except Exception as e:
-            print(f"Error with {model_type}-{model_size} model: {e}")
+    if not model_configs:
+        print("No model selected. Exiting.")
+        return
         
-        if len(model_configs) > 1:
-            input("\nPress Enter to continue to the next model...")
+    try:
+        # Validate input file
+        if not os.path.exists(args.input_file):
+            print("Please provide a valid input file path.")
+            return
+            
+        # Process each model configuration
+        for model_type, model_size in model_configs:
+            print(f"\nGenerating summary using {model_type}-{model_size}...")
+            
+            # Generate summary
+            summary = generate_summary(
+                model_type=model_type,
+                model_size=model_size,
+                file_path=args.input_file,
+                parser_type=args.parser,
+                return_metadata=args.metadata
+            )
+            
+            # Print the summary
+            print("\nGenerated Summary:")
+            print("=" * 50)
+            print(summary)
+            
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     try:
