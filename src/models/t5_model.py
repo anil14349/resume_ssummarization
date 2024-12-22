@@ -1,7 +1,9 @@
 """T5 model implementation for resume summary generation."""
-from transformers import T5ForConditionalGeneration, T5Tokenizer
-from models.base_model import BaseResumeModel
-from config.model_prompts import T5_SUMMARY_TEMPLATE, SUMMARY_TEMPLATES
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from .base_model import BaseResumeModel
+from config.model_config import T5_CONFIG
+from config.model_prompts import T5_PROMPT, SUMMARY_TEMPLATES
+from config.text_config import TEXT_CLEAN_CONFIG
 
 class T5ResumeModel(BaseResumeModel):
     def __init__(self, model_name="t5-base", device="cpu"):
@@ -36,130 +38,82 @@ class T5ResumeModel(BaseResumeModel):
 
     def clean_output(self, text):
         """Clean up the T5 model output."""
-        # Get name from template data
+        # Get name and role from stored data
         name = self.current_name if hasattr(self, 'current_name') else "Unknown"
+        role = self.current_role if hasattr(self, 'current_role') else ""
+        company = self.current_company if hasattr(self, 'current_company') else ""
+        experience = self.current_experience if hasattr(self, 'current_experience') else ""
+        achievements = self.current_achievements if hasattr(self, 'current_achievements') else ""
         
-        # Add default professional summary if the generation is too short
-        if len(text.split()) < 50:
-            return f"""Hi, I am {name}. I am a Human Resources Generalist at Lamna Healthcare Company with 4 years of experience in HR, specializing in talent recruitment, employee retention, and compliance management. I have successfully improved employee retention rates by over 10% and reduced recruitment costs by 14% through strategic initiatives. My expertise includes OSHA compliance, policy development, and implementing effective HR strategies."""
-            
-        # Remove any generated prefixes or instructions
-        prefixes_to_remove = [
-            "Here's a professional summary:",
-            "Professional summary:",
-            "Summary:",
-            "Here is a summary:",
-            "Write a professional first-person summary",
-            "Write a concise",
-            "Generate a",
-            "Create a",
-            "that highlights",
-            "current position:",
-            "Current Position:",
-            "background:",
-            "Background:",
-            "experience:",
-            "Experience:",
-            "skills:",
-            "Skills:",
-            "education:",
-            "Education:",
-            "my experience, achievements, and expertise",
-            "My experience, achievements, and expertise",
-            "Professional first-person summary for a Human Resources Generalist:",
-            "Current Role:",
-            "Key Achievements:",
-            "Core Skills:",
-            "name:",
-            "Name:",
-            "current role:",
-            "accomplishments include:",
-            "core",
-            "For this profile",
-            "focus on current role, achievements, and expertise",
-            "in a clear, professional tone",
-            "create a positive work environment by"
+        # Remove any generated prefixes
+        prefixes = TEXT_CLEAN_CONFIG['prefixes_to_remove'] + [
+            f"Hi, I am Hi, I am {name}",
+            "True Story:",
+            "Here's my story:",
+            "Let me tell you about myself:",
+            "Here's what I do:",
+            "write a detailed",
+            "create a summary",
+            "generate a summary",
+            "professional summary",
+            "first-person summary"
         ]
-        for prefix in prefixes_to_remove:
+        for prefix in prefixes:
             if text.lower().startswith(prefix.lower()):
                 text = text[len(prefix):].strip()
             text = text.replace(prefix, "")
-
-        # Fix common formatting issues
+        
+        # Fix formatting
+        text = text.replace("  ", " ")
         text = text.replace(" .", ".")
         text = text.replace(" ,", ",")
-        text = text.replace("  ", " ")
         text = text.replace(" at at ", " at ")
         text = text.replace("I am a I am", "I am")
         text = text.replace("I am an I am", "I am")
-        text = text.replace(" i ", " I ")
-        text = text.replace(" hr ", " HR ")
-        text = text.replace(" osha ", " OSHA ")
-        text = text.replace(" gpa", " GPA")
-        text = text.replace(" ba ", " BA ")
-        text = text.replace("human resources", "Human Resources")
-        text = text.replace("bachelor of arts", "Bachelor of Arts")
-        text = text.replace(" compliance", " compliance management")
-        text = text.replace(" retention", " retention strategies")
-        text = text.replace(" recruitment", " talent recruitment")
-        text = text.replace(" hiring", " hiring processes")
         
-        # Fix capitalization
-        text = text.strip()
-        if text and not text[0].isupper():
-            text = text[0].upper() + text[1:]
-            
-        # Ensure consistent name handling
-        text = text.replace("Hi, I am", "Hi, I am")  # Keep the greeting format
-        text = text.replace("Hi, this is", "Hi, I am")
-        text = text.replace("Hello, I am", "Hi, I am")
-        
-        # Fix perspective
-        text = text.replace("This person is", "I am")
-        text = text.replace("They have", "I have")
-        text = text.replace("Their experience", "My experience")
-        text = text.replace("Their skills", "My skills")
-        text = text.replace("Their role", "My role")
-        
-        # Fix company names
-        text = text.replace("Falafel Healthcare", "Lamna Healthcare")
-        
-        # Add period at the end if missing
-        if not text.endswith('.'):
-            text += '.'
-        
-        # Clean up any remaining artifacts
-        text = text.replace(" years in HR ", " years of experience in HR, specializing in ")
-        text = text.replace(" at Lamna Healthcare Company, Wholeness Healthcare ", " at Lamna Healthcare Company. ")
+        # Apply word replacements from config
+        for old, new in TEXT_CLEAN_CONFIG['word_replacements'].items():
+            text = text.replace(old, new)
         
         # Add name introduction if missing
-        if not any(text.lower().startswith(prefix) for prefix in ["hi, i am", "hello, i am"]):
-            text = f"Hi, I am {name}. "
+        if not text.lower().startswith("hi, i am"):
+            text = f"Hi, I am {name}. " + text
+        
+        # Add role and experience if missing
+        intro_text = f"Hi, I am {name}. I am a {role} at {company}"
+        if experience:
+            intro_text += f" with {experience} years of experience in HR"
+        intro_text += "."
+        
+        if not any(pattern in text for pattern in [f"{role} at {company}", f"{role} with {company}"]):
+            text = text.replace(f"Hi, I am {name}.", intro_text)
+        
+        # Add achievements if missing
+        if achievements and not any(metric in text for metric in ["10%", "14%", "90%", "improved", "increased", "reduced"]):
+            text = text.rstrip(".") + f". {achievements}"
         
         # Ensure proper sentence structure
-        text = text.replace(". .", ".")
-        text = text.replace("..", ".")
-        text = text.replace(" human resources generalist", " Human Resources Generalist")
-        text = text.replace(" human resources management", " Human Resources Management")
+        sentences = [s.strip() for s in text.split(".") if s.strip()]
+        cleaned_sentences = []
+        for sentence in sentences[:TEXT_CLEAN_CONFIG['formatting']['max_sentences']]:
+            # Remove duplicate role mentions
+            if cleaned_sentences and role in sentence and role in cleaned_sentences[0]:
+                continue
+            if sentence:
+                if not sentence.endswith("."):
+                    sentence += "."
+                cleaned_sentences.append(sentence)
         
-        # Fix skills formatting
-        if "recruitment, hiring, compliance" in text.lower():
-            text = text.replace("recruitment, hiring, compliance", 
-                              "talent recruitment, strategic hiring, and compliance management")
-            
-        # Add role and experience if missing after name
-        if f"Hi, I am {name}." in text and not "Human Resources Generalist" in text[20:]:
-            text = text.replace(f"Hi, I am {name}.", 
-                              f"Hi, I am {name}. I am a Human Resources Generalist at Lamna Healthcare Company with 4 years of experience in HR, specializing in talent recruitment, employee retention, and compliance management. I have successfully improved employee retention rates by over 10% and reduced recruitment costs by 14% through strategic initiatives.")
-            
-        # Enhance achievements
-        text = text.replace("raising employee retention rates", 
-                          "successfully improving employee retention rates")
-        text = text.replace("reduced year-over-year recruitment costs",
-                          "strategically reduced year-over-year recruitment costs")
-            
-        return text.strip()
-
+        text = " ".join(cleaned_sentences)
+        
+        # Fix any remaining formatting issues
+        text = text.replace("..", ".")
+        text = text.replace("  ", " ")
+        text = text.replace('"', "")
+        text = text.strip()
+        
+        return text
+    
     def format_template_data(self, formatted_data):
         """Format data for template, with additional preprocessing for T5."""
         template_data = super().format_template_data(formatted_data)
@@ -179,54 +133,38 @@ class T5ResumeModel(BaseResumeModel):
         return template_data
     
     def generate_prompt(self, formatted_data):
-        """Generate a structured prompt for T5 model."""
+        """Generate a prompt using the template strings."""
+        # Store data for clean_output
+        self.current_name = formatted_data['name']
+        self.current_role = formatted_data['current_role']
+        self.current_company = formatted_data['companies'].split(',')[0].strip() if formatted_data.get('companies') else ""
+        self.current_experience = formatted_data.get('years_experience', "")
+        self.current_achievements = formatted_data.get('achievements', "")
+        
+        # Format template data
         template_data = self.format_template_data(formatted_data)
-        self.current_name = template_data['name']  # Store name for clean_output
         
-        # Format template data using common templates
-        template_vars = {
-            'name': template_data['name'],
-            'role': SUMMARY_TEMPLATES['role'].format(**template_data),
-            'company': SUMMARY_TEMPLATES['company'].format(**template_data),
-            'experience': SUMMARY_TEMPLATES['experience'].format(**template_data),
-            'achievements': SUMMARY_TEMPLATES['achievements'].format(**template_data),
-            'skills': SUMMARY_TEMPLATES['skills'].format(**template_data),
-            'education': SUMMARY_TEMPLATES['education'].format(**template_data)
-        }
+        # Get templates from config
+        templates = {k: v.format(**template_data) for k, v in SUMMARY_TEMPLATES.items()}
         
-        # Generate prompt using T5 template
-        prompt = f"""Write a detailed professional first-person summary that includes achievements:
-
-Name: {template_vars['name']}
-Current Role: {template_vars['role']} at {template_vars['company']}
-Experience: {template_vars['experience']} in HR
-Key Achievements: 
-- Successfully improved employee retention rates by over 10%
-- Reduced recruitment costs by 14% through strategic initiatives
-Core Skills: {template_vars['skills']}
-Education: {template_vars['education']}
-
-Start with "Hi, I am {template_vars['name']}" and create a comprehensive summary that:
-1. Introduces your current role and experience
-2. Highlights your key achievements with specific metrics
-3. Emphasizes your expertise in talent recruitment, employee retention, and compliance
-4. Mentions your strategic approach to HR management
-5. Includes your educational background
-
-Make the summary engaging and professional, focusing on your impact and results."""
+        # Create prompt using T5_PROMPT from config
+        prompt = T5_PROMPT.format(**templates)
         
-        return prompt
+        # T5 works better with explicit task prefixes
+        prompt = "summarize professionally: " + prompt
+        
+        return prompt.replace('\n', ' ').strip()
 
     def generate_summary(self, input_json):
-        """Generate a professional summary using T5 model."""
+        """Generate a summary using T5 model."""
         try:
+            # Format input data
             formatted_data = self.format_input_data(input_json)
+            
+            # Generate prompt
             prompt = self.generate_prompt(formatted_data)
             
-            # Add task prefix for better results
-            prompt = "summarize professionally: " + prompt
-            
-            # Encode the input text
+            # Tokenize input
             input_ids = self.tokenizer(
                 prompt,
                 return_tensors="pt",
@@ -237,40 +175,24 @@ Make the summary engaging and professional, focusing on your impact and results.
             if self.device == "cuda":
                 input_ids = input_ids.to(self.device)
             
-            # Generate multiple candidates and pick the best one
-            num_return_sequences = 3
+            # Generate summary with focused parameters
             outputs = self.model.generate(
                 input_ids,
-                num_return_sequences=num_return_sequences,
-                **self.config['model']['generation_params']
+                max_length=200,
+                min_length=100,
+                num_beams=4,
+                length_penalty=2.0,
+                no_repeat_ngram_size=3,
+                early_stopping=True,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.9,
+                repetition_penalty=2.0
             )
             
-            # Clean and score each candidate
-            candidates = []
-            for output in outputs:
-                summary = self.tokenizer.decode(output, skip_special_tokens=True)
-                cleaned = self.clean_output(summary)
-                # Score based on content and length
-                score = (
-                    len(cleaned.split()) +  # Length
-                    (3 if "HR" in cleaned else 0) +  # Domain relevance
-                    (2 if "achievements" in cleaned.lower() else 0) +  # Achievements
-                    (2 if "experience" in cleaned.lower() else 0) +  # Experience
-                    (2 if "skills" in cleaned.lower() else 0) +  # Skills
-                    (3 if cleaned.startswith("Hi, I am") else 0) +  # Proper introduction
-                    (2 if "expertise" in cleaned.lower() else 0) +  # Professional tone
-                    (2 if "Human Resources Generalist" in cleaned else 0) +  # Role mention
-                    (3 if "10%" in cleaned else 0) +  # Specific metrics
-                    (3 if "14%" in cleaned else 0) +  # Specific metrics
-                    (2 if "strategic" in cleaned.lower() else 0) +  # Strategic focus
-                    (2 if "talent" in cleaned.lower() else 0)  # HR terminology
-                )
-                candidates.append((score, cleaned))
-            
-            # Return the highest scoring candidate
-            candidates.sort(reverse=True)
-            return candidates[0][1]
+            # Decode and clean output
+            summary = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            return self.clean_output(summary)
             
         except Exception as e:
-            print(f"Error generating summary: {str(e)}")
-            return "Unable to generate summary due to an error."
+            raise RuntimeError(f"Error in T5 generation: {str(e)}")

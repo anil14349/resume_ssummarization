@@ -26,7 +26,20 @@ TEXT_CLEAN_CONFIG = {
         "Write a professional first-person summary based on this profile:",
         "Recognition:",
         "Generate a concise professional summary in first person:",
-        "Key "
+        "Key ",
+        "write a detailed professional first-person summary",
+        "that starts with",
+        "outline your current role and experience",
+        "describe your role",
+        "highlight your achievements",
+        "emphasize your expertise",
+        "mention your skills",
+        "include your education",
+        "focus on your impact",
+        "showcase your",
+        "demonstrate your",
+        "as a Human Resources generalist",
+        "as a Human Resources Generalist"
     ],
     'word_replacements': {
         " hr ": " HR ",
