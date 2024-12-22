@@ -1,31 +1,37 @@
+# model/bart_model.py
 from transformers import BartTokenizer, BartForConditionalGeneration
 import torch
 from .base_model import BaseResumeModel
 from config.model_config import BART_CONFIG
 from config.model_prompts import BART_PROMPT, SUMMARY_TEMPLATES
+from config.cache_config import CACHE_CONFIG
 
 class BartResumeModel(BaseResumeModel):
-    def __init__(self, model_name="facebook/bart-base", cache_dir=None):
+    def __init__(self, model_name="facebook/bart-base"):
         super().__init__()
         self.config.update(BART_CONFIG)
         if model_name != "facebook/bart-base":
             self.config['model']['name'] = model_name
         
+        # Get cache directory from config
+        self.cache_dir = CACHE_CONFIG['cache']['location']['base_dir']
+        
         # Initialize tokenizer and model with caching
         self.tokenizer = BartTokenizer.from_pretrained(
             self.config['model']['name'],
-            cache_dir=cache_dir,
-            local_files_only=cache_dir is not None,
             model_max_length=1024,
             force_download=False,
             legacy=False,
+            padding_side='left',
+            cache_dir=self.cache_dir,
+            local_files_only=False  # Allow downloading if not in cache
         )
         
         self.model = BartForConditionalGeneration.from_pretrained(
             self.config['model']['name'],
-            cache_dir=cache_dir,
-            local_files_only=cache_dir is not None,
-            force_download=False
+            force_download=False,
+            cache_dir=self.cache_dir,
+            local_files_only=False  # Allow downloading if not in cache
         )
     
     def generate_prompt(self, formatted_data):

@@ -1,3 +1,4 @@
+# models/base_model.py
 """Base class for all resume models."""
 import re
 from abc import ABC, abstractmethod

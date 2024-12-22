@@ -1,30 +1,35 @@
+# models/t5_model.py
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
 from .base_model import BaseResumeModel
 from config.model_config import T5_CONFIG
 from config.model_prompts import T5_PROMPT, SUMMARY_TEMPLATES
+from config.cache_config import CACHE_CONFIG
 
 class T5ResumeModel(BaseResumeModel):
-    def __init__(self, model_name="t5-base", cache_dir=None):
+    def __init__(self, model_name="t5-base"):
         super().__init__()
         self.config.update(T5_CONFIG)
         if model_name != "t5-base":
             self.config['model']['name'] = model_name
+        
+        # Get cache directory from config
+        self.cache_dir = CACHE_CONFIG['cache']['location']['base_dir']
         
         # Initialize tokenizer with proper max length and legacy behavior
         self.tokenizer = T5Tokenizer.from_pretrained(
             self.config['model']['name'],
             model_max_length=1024,  # Set appropriate max length
             legacy=False,  # Use new behavior
-            cache_dir=cache_dir,
-            local_files_only=cache_dir is not None
+            cache_dir=self.cache_dir,
+            local_files_only=False  # Allow downloading if not in cache
         )
         
-        # Initialize model with force_download=True to avoid deprecated warning
+        # Initialize model
         self.model = T5ForConditionalGeneration.from_pretrained(
             self.config['model']['name'],
-            cache_dir=cache_dir,
-            local_files_only=cache_dir is not None
+            cache_dir=self.cache_dir,
+            local_files_only=False  # Allow downloading if not in cache
         )
     
     def format_template_data(self, formatted_data):

@@ -1,3 +1,4 @@
+# models/gpt2_model.py
 """
 GPT-2 model implementation for resume summary generation.
 """
@@ -6,18 +7,22 @@ from .base_model import BaseResumeModel
 from config.model_config import GPT2_CONFIG
 from config.model_prompts import GPT2_PROMPT, SUMMARY_TEMPLATES
 from config.app_config import SUMMARY_CONFIG
+from config.cache_config import CACHE_CONFIG
 
 class GPT2ResumeModel(BaseResumeModel):
-    def __init__(self, model_name="gpt2-medium", cache_dir=None):
+    def __init__(self, model_name="gpt2-medium"):
         super().__init__()
         self.config.update(GPT2_CONFIG)
         self.model_name = model_name
         
-        # Initialize tokenizer and model
+        # Get cache directory from config
+        self.cache_dir = CACHE_CONFIG['cache']['location']['base_dir']
+        
+        # Initialize tokenizer and model with custom cache location
         self.tokenizer = GPT2Tokenizer.from_pretrained(
             self.model_name,
-            cache_dir=cache_dir,
-            local_files_only=cache_dir is not None
+            cache_dir=self.cache_dir,
+            local_files_only=False  # Allow downloading if not in cache
         )
         # Set pad token to eos_token
         if self.tokenizer.pad_token is None:
@@ -25,8 +30,8 @@ class GPT2ResumeModel(BaseResumeModel):
         
         self.model = GPT2LMHeadModel.from_pretrained(
             self.model_name,
-            cache_dir=cache_dir,
-            local_files_only=cache_dir is not None
+            cache_dir=self.cache_dir,
+            local_files_only=False  # Allow downloading if not in cache
         )
         
         # Set pad token ID

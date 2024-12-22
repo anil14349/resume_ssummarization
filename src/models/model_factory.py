@@ -1,3 +1,4 @@
+# models/model_factory.py
 from .t5_model import T5ResumeModel
 from .gpt2_model import GPT2ResumeModel
 from .bart_model import BartResumeModel
@@ -36,21 +37,21 @@ class ResumeModelFactory:
         
         if model_type == "t5":
             model_name = f"t5-{model_size}"
-            return T5ResumeModel(model_name, cache_dir=cached_path)
+            return T5ResumeModel(model_name)
         
         elif model_type == "gpt2":
             if model_size == "base":
                 model_name = "gpt2"
             else:
                 model_name = f"gpt2-{model_size}"
-            return GPT2ResumeModel(model_name, cache_dir=cached_path)
+            return GPT2ResumeModel(model_name)
         
         elif model_type == "bart":
             if model_size == "base":
                 model_name = "facebook/bart-base"
             else:
                 model_name = f"facebook/bart-{model_size}"
-            return BartResumeModel(model_name, cache_dir=cached_path)
+            return BartResumeModel(model_name)
         
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
