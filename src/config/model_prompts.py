@@ -1,5 +1,5 @@
 """
-Model prompt templates.
+Model prompts and templates.
 """
 
 from typing import Dict
@@ -48,13 +48,25 @@ Create a summary that:
 4. Shows your expertise and impact"""
 
 # GPT2-specific prompt template
-GPT2_PROMPT = """Hi, I am {name}. I am a {role} at {company} with {experience} years of experience in HR. {achievements}
+GPT2_PROMPT = '''Generate a professional resume summary for:
 
-Technical Skills: {skills}
-Education: {education}
-{recognition}
+Name: {name}
+Current Role: {role}
+Company: {company}
+Experience: {experience} years
+Key Achievements: {achievements}
+Core Skills: {skills}
 
-Write a professional first-person summary that highlights my experience and achievements."""
+Write a concise professional summary (3-4 sentences) that:
+1. Introduces you by name
+2. Describes your current role and experience
+3. Highlights your key achievements with metrics
+4. Showcases your most relevant skills
+
+Example Output:
+"Hi, I am Sarah Chen. I am a Senior HR Manager at TechCorp with 8 years of experience in talent acquisition and employee development. I have successfully implemented performance management systems that improved employee retention by 25% and reduced hiring costs by 30%. My expertise includes HRIS implementation, policy development, and strategic workforce planning."
+
+Write a similar summary for the above person:'''
 
 # BART-specific prompt template
 BART_PROMPT = """Generate a concise professional summary in first person:
