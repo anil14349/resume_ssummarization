@@ -2,6 +2,39 @@
 
 A sophisticated resume summary generation system that uses transformer models with few-shot learning and chain-of-thought reasoning for high-quality outputs.
 
+## Architecture
+
+```mermaid
+graph TD
+    Client[Client Application] --> API[API Layer]
+    API --> ModelFactory[Enhanced Model Factory]
+    
+    ModelFactory --> GPT2[GPT-2 Model]
+    ModelFactory --> T5[T5 Model]
+    ModelFactory --> BART[BART Model]
+    
+    subgraph Input Processing
+        API --> Parser[Resume Parser]
+        Parser --> TextCleaner[Text Cleaner]
+        TextCleaner --> Tokenizer[Tokenizer]
+    end
+    
+    subgraph Model Enhancement
+        ModelFactory --> FewShot[Few-Shot Learning]
+        ModelFactory --> CoT[Chain of Thought]
+        FewShot --> Generator[Generator]
+        CoT --> Generator
+    end
+    
+    subgraph Output Processing
+        Generator --> Evaluator[Output Evaluator]
+        Evaluator --> Metrics[Metrics Calculator]
+        Evaluator --> Summary[Final Summary]
+    end
+```
+
+For detailed documentation of all components, please refer to the [docs](./docs) directory.
+
 ## Features
 
 ### Core Functionality
