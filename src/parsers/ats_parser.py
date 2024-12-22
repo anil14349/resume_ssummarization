@@ -1,16 +1,23 @@
-"""ATS resume parser."""
-from docx import Document
-import json
+"""ATS resume parser.
+this code uses ATS classic HR resume.docx file as template format to extract data, which is under templates folder
+"""
+import logging
 import re
 from datetime import datetime
-import logging
+from typing import List, Dict, Any
+from docx import Document
+
+from .base_parser import BaseParser
 
 logger = logging.getLogger(__name__)
 
-class ATSParser:
-    def __init__(self, file_path):
-        self.file_path = file_path
-        logger.debug(f"Initializing ATSParser with file: {file_path}")
+
+class ATSParser(BaseParser):
+    """Parser for ATS-formatted resumes."""
+    
+    def __init__(self):
+        """Initialize ATS parser."""
+        super().__init__()
 
     def clean_text(self, text):
         """Clean and normalize text."""
@@ -79,8 +86,7 @@ class ATSParser:
             end = end_date if end_date else current_date
             
             # Calculate years
-            years = (end.year - start_date.year) + 
-                    (end.month - start_date.month) / 12
+            years = (end.year - start_date.year) + (end.month - start_date.month) / 12
             total_years += max(0, years)  # Ensure non-negative
             
             logger.debug(f"Date range {start_date} - {end}: {years:.1f} years")
@@ -88,203 +94,335 @@ class ATSParser:
         logger.debug(f"Total years experience: {total_years:.1f}")
         return round(total_years, 1)
 
-    def extract_company_info(self, text):
-        """Extract company name and dates from text."""
-        logger.debug(f"Extracting company info from: '{text}'")
-        
-        # Initialize result
-        result = {
-            'company': None,
-            'dates': None
-        }
-        
-        # Common company indicators
-        company_indicators = [
-            r'at\s+([^,|]+)',
-            r'with\s+([^,|]+)',
-            r'for\s+([^,|]+)',
-            r'\|\s*([^|,]+)\s*\|'
+    def _extract_company(self, text: str) -> str:
+        """Extract company name from text."""
+        # Look for patterns like "Company Name | Role" or "Role | Company Name"
+        company_patterns = [
+            r'(?:at|with|for)\s+([A-Z][A-Za-z\s]+(?:Inc|LLC|Ltd|Corp|Company|Healthcare|Solutions))',
+            r'\|\s*([A-Z][A-Za-z\s]+(?:Inc|LLC|Ltd|Corp|Company|Healthcare|Solutions))',
+            r'([A-Z][A-Za-z\s]+(?:Inc|LLC|Ltd|Corp|Company|Healthcare|Solutions))\s*\|'
         ]
         
-        # Try to extract company name
-        for pattern in company_indicators:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                result['company'] = match.group(1).strip()
-                logger.debug(f"Found company: {result['company']}")
-                break
-                
-        # Extract dates
-        date_pattern = r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+20\d{2}|20\d{2}|Present|Current)'
-        dates = re.findall(date_pattern, text, re.IGNORECASE)
+        for pattern in company_patterns:
+            matches = re.findall(pattern, text)
+            if matches:
+                # Take the longest match as it's likely the most complete
+                return max(matches, key=len).strip()
         
-        if len(dates) >= 2:
-            start_date = self.parse_date(dates[0])
-            end_date = self.parse_date(dates[1])
-            if start_date and end_date:
-                result['dates'] = (start_date, end_date)
-                logger.debug(f"Found date range: {start_date} - {end_date}")
-        elif len(dates) == 1:
-            # Single date might be start date of current position
-            start_date = self.parse_date(dates[0])
-            if start_date:
-                result['dates'] = (start_date, None)  # None indicates current
-                logger.debug(f"Found single date (assumed current): {start_date}")
-                
-        return result
+        # If no match found, look for capitalized words that might be company names
+        words = text.split()
+        for i, word in enumerate(words):
+            if word[0].isupper() and len(word) > 2:
+                # Check if next word is also capitalized (likely part of company name)
+                if i < len(words) - 1 and words[i + 1][0].isupper():
+                    return f"{word} {words[i + 1]}".strip()
+                return word.strip()
+        
+        return "Unknown Company"
 
-    def extract_role(self, text):
-        """Extract role from text."""
-        logger.debug(f"Extracting role from: '{text}'")
+    def _extract_achievements(self, text: str) -> List[str]:
+        """Extract achievements from text."""
+        achievements = []
         
-        # Common role patterns
-        role_patterns = [
-            r'^([^|]+)\|',  # Everything before first pipe
-            r'^([^,]+),',   # Everything before first comma
-            r'(.*?)\s+at\s+',  # Everything before " at "
-            r'(.*?)\s+with\s+'  # Everything before " with "
+        # Look for bullet points or numbered achievements
+        achievement_patterns = [
+            r'[•\-\*]\s*(.*?)(?=(?:[•\-\*]|\n|$))',
+            r'\d+\.\s*(.*?)(?=(?:\d+\.|\n|$))',
+            r'(?:^|\n)(?!.*?(?:education|skills|experience|profile):)([A-Z][^.!?]*?(?:increased|decreased|reduced|improved|developed|implemented|led|managed|created|designed|launched|achieved|won|earned|saved|generated)[^.!?]*[.!?])'
         ]
         
-        for pattern in role_patterns:
-            match = re.search(pattern, text)
-            if match:
-                role = match.group(1).strip()
-                logger.debug(f"Found role: {role}")
-                return role
+        # Look for sentences with metrics or key achievements
+        metric_patterns = [
+            r'(?:increased|improved|reduced|decreased|saved|generated|achieved)\s+[^.!?]*?(?:\d+%|\$\d+|\d+\s*(?:percent|million|billion|thousand))[^.!?]*[.!?]',
+            r'(?:led|managed|developed|implemented|created|designed|launched)\s+[^.!?]*?(?:team|project|initiative|program|system)[^.!?]*[.!?]',
+            r'(?:successfully|effectively)\s+[^.!?]*?(?:improved|increased|reduced|developed|implemented)[^.!?]*[.!?]'
+        ]
+        
+        # Process achievement patterns
+        for pattern in achievement_patterns + metric_patterns:
+            matches = re.finditer(pattern, text, re.MULTILINE | re.IGNORECASE)
+            for match in matches:
+                achievement = match.group(1).strip() if len(match.groups()) > 0 else match.group(0).strip()
                 
-        logger.debug("No role found")
-        return None
+                # Clean up achievement text
+                achievement = re.sub(r'\s+', ' ', achievement)  # Replace multiple spaces
+                achievement = achievement.strip('.')  # Remove trailing period
+                
+                # Only keep substantial and relevant achievements
+                if (
+                    achievement 
+                    and len(achievement.split()) >= 4  # Must be substantial
+                    and not any(x in achievement.lower() for x in ['education', 'gpa', 'honor society', 'university'])  # Skip education
+                    and not any(x.lower() == achievement.lower() for x in achievements)  # Avoid duplicates
+                ):
+                    # Clean up and format
+                    achievement = achievement[0].upper() + achievement[1:]  # Capitalize first letter
+                    if not achievement.endswith(('.', '!', '?')):
+                        achievement += '.'
+                    achievements.append(achievement)
+        
+        # Sort achievements by length and quality
+        achievements.sort(key=lambda x: (
+            # Prioritize achievements with metrics
+            -len(re.findall(r'\d+%|\$\d+|\d+\s*(?:percent|million|billion|thousand)', x)),
+            # Then by presence of key verbs
+            -len(re.findall(r'increased|improved|reduced|developed|implemented|led|managed', x.lower())),
+            # Then by length (prefer longer, more detailed achievements)
+            -len(x)
+        ))
+        
+        # Return top 3 achievements
+        return achievements[:3]
 
-    def extract_skills(self, text):
+    def _extract_skills(self, text: str) -> List[str]:
         """Extract skills from text."""
-        logger.debug(f"Extracting skills from: '{text}'")
+        skills = set()
         
         # Common HR skills
-        skill_keywords = [
-            'Recruitment', 'Talent Acquisition', 'Employee Relations',
-            'HR Policies', 'Compliance', 'Performance Management',
-            'Training', 'Employee Engagement', 'Leadership',
-            'HRIS', 'Benefits Administration', 'Onboarding',
-            'Compensation', 'Labor Relations', 'Diversity',
-            'Workforce Planning', 'Change Management'
+        hr_skills = [
+            'recruitment', 'hiring', 'onboarding', 'training', 'development',
+            'performance management', 'employee relations', 'benefits administration',
+            'compensation', 'payroll', 'HRIS', 'compliance', 'policy development',
+            'talent acquisition', 'succession planning', 'workforce planning',
+            'employee engagement', 'diversity', 'inclusion', 'labor relations',
+            'conflict resolution', 'leadership development', 'organizational development',
+            'change management', 'project management', 'data analytics', 'reporting',
+            'budgeting', 'vendor management', 'benefits', 'employee satisfaction',
+            'talent management', 'HR strategy', 'employee retention', 'HR policies',
+            'HR programs', 'employee communications', 'employee experience',
+            'performance evaluation', 'team building', 'coaching', 'mentoring',
+            'employee advocacy', 'workplace culture', 'HR metrics', 'HR analytics',
+            'employee surveys', 'HRMS', 'ATS', 'HRIS implementation'
         ]
         
-        found_skills = []
-        for skill in skill_keywords:
-            if re.search(r'\b' + re.escape(skill) + r'\b', text, re.IGNORECASE):
-                found_skills.append(skill)
-                logger.debug(f"Found skill: {skill}")
+        # Look for skills in text
+        text_lower = text.lower()
+        for skill in hr_skills:
+            if skill.lower() in text_lower:
+                skills.add(skill)
+        
+        # Look for additional skills
+        skill_patterns = [
+            r'(?:proficient|skilled|expertise|experienced)\s+(?:in|with)?\s+([^.]*)',
+            r'(?:skills|abilities):\s*([^.]*)',
+            r'(?:^|\n)(?:•|\*|\-|\d+\.)\s*([A-Za-z\s]+(?:management|planning|development|analysis|implementation|design|coordination))'
+        ]
+        
+        for pattern in skill_patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                skill_text = match.group(1).strip()
+                # Split into individual skills
+                for skill in skill_text.split(','):
+                    skill = skill.strip()
+                    if skill and len(skill.split()) <= 3:  # Keep skills concise
+                        skills.add(skill)
+        
+        return list(skills)
+
+    def _extract_years_experience(self, text: str) -> float:
+        """Extract years of experience from text."""
+        # Look for explicit mentions of years
+        year_patterns = [
+            r'(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?experience',
+            r'(?:experience|work(?:ing)?|professional)\s+(?:of|for)?\s*(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)',
+            r'(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)\s+(?:in|as)\s+(?:HR|Human\s+Resources|the\s+field)'
+        ]
+        
+        for pattern in year_patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                try:
+                    years = float(match.group(1))
+                    if years > 0 and years < 50:  # Sanity check
+                        return years
+                except ValueError:
+                    continue
+        
+        # If no explicit mention, try to calculate from work history
+        date_pattern = r'(?:19|20)\d{2}'
+        dates = re.findall(date_pattern, text)
+        if dates:
+            dates = [int(d) for d in dates]
+            years = max(dates) - min(dates)
+            if years > 0 and years < 50:
+                return float(years)
+        
+        # Default to a reasonable value if no clear indication
+        return 5.0
+
+    def _extract_companies(self, text: str) -> List[str]:
+        """Extract companies from text."""
+        companies = []
+        
+        # Look for company names
+        company_patterns = [
+            r'(?:at|with|for)\s+([A-Z][A-Za-z\s]+(?:Inc|LLC|Ltd|Corp|Company|Healthcare|Solutions))',
+            r'\|\s*([A-Z][A-Za-z\s]+(?:Inc|LLC|Ltd|Corp|Company|Healthcare|Solutions))',
+            r'([A-Z][A-Za-z\s]+(?:Inc|LLC|Ltd|Corp|Company|Healthcare|Solutions))\s*\|'
+        ]
+        
+        for pattern in company_patterns:
+            matches = re.finditer(pattern, text)
+            for match in matches:
+                company = match.group(1).strip()
+                if company and not any(c.lower() == company.lower() for c in companies):
+                    companies.append(company)
+        
+        # If no matches found, look for company-like names
+        if not companies:
+            # Split text into lines and look for company-like names
+            lines = text.split('\n')
+            for line in lines:
+                # Look for lines that might contain company names
+                if '|' in line:  # Common format in resumes
+                    parts = line.split('|')
+                    for part in parts:
+                        part = part.strip()
+                        if part and part[0].isupper() and 'experience' not in part.lower():
+                            companies.append(part)
+                            
+        # If still no companies found, look for capitalized phrases
+        if not companies:
+            # Look for consecutive capitalized words
+            matches = re.finditer(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', text)
+            for match in matches:
+                company = match.group(1).strip()
+                if company and not any(c.lower() == company.lower() for c in companies):
+                    companies.append(company)
+        
+        # If no companies found at all, use a default
+        if not companies:
+            companies = ["Unknown Company"]
+            
+        return companies[:3]  # Return at most 3 companies
+
+    def _extract_name(self, text: str) -> str:
+        """Extract name from text."""
+        # Look for name at the start of the document
+        lines = text.split('\n')
+        for line in lines[:3]:  # Check first 3 lines
+            # Skip empty lines and common headers
+            if not line.strip() or any(header in line.lower() for header in ['resume', 'cv', 'curriculum']):
+                continue
                 
-        return found_skills
+            # Look for a name (2-3 words, each capitalized)
+            words = line.strip().split()
+            if 2 <= len(words) <= 3 and all(word[0].isupper() for word in words):
+                return ' '.join(words)
+                
+            # Look for a name before contact info
+            if any(info in line.lower() for info in ['@', 'email', 'phone', 'address']):
+                before_contact = line.split('@')[0] if '@' in line else line.split('•')[0]
+                words = before_contact.strip().split()
+                if 2 <= len(words) <= 3 and all(word[0].isupper() for word in words):
+                    return ' '.join(words)
+        
+        return ""
 
-    def extract_achievement(self, text):
-        """Extract achievement from text."""
-        logger.debug(f"Extracting achievement from: '{text}'")
-        
-        # Skip if too short
-        if len(text.split()) < 4:
-            logger.debug("Text too short, skipping")
-            return None
+    def _extract_role(self, text: str) -> str:
+        """Extract current role from text."""
+        # Look for role in professional summary
+        lines = text.split('\n')
+        for line in lines:
+            line = line.strip()
             
-        # Look for metrics
-        metrics_pattern = r'\d+%|\$\d+|\d+\s*million|\d+\s*k|\d+\s*employees'
-        has_metrics = bool(re.search(metrics_pattern, text, re.IGNORECASE))
-        
-        # Look for action verbs
-        action_verbs = [
-            'achieved', 'improved', 'trained', 'managed', 'developed',
-            'created', 'implemented', 'reduced', 'increased', 'led',
-            'launched', 'established', 'coordinated', 'streamlined',
-            'generated', 'saved', 'delivered', 'built', 'designed'
-        ]
-        has_action = any(re.search(r'\b' + verb + r'\b', text, re.IGNORECASE) 
-                        for verb in action_verbs)
-        
-        if has_metrics or has_action:
-            logger.debug(f"Found achievement: {text}")
-            logger.debug(f"Has metrics: {has_metrics}, Has action verb: {has_action}")
-            return text.strip()
+            # Look for common role indicators
+            role_indicators = [
+                'years of experience',
+                'professional with',
+                'specialist in',
+                'expert in',
+                'generalist',
+                'manager',
+                'director'
+            ]
             
-        logger.debug("No achievement indicators found")
-        return None
+            if any(indicator in line.lower() for indicator in role_indicators):
+                # Extract the role part (usually before 'with' or similar)
+                for splitter in ['with', 'having', 'possessing']:
+                    if splitter in line.lower():
+                        role = line.split(splitter)[0].strip()
+                        if 3 <= len(role.split()) <= 10:  # Reasonable length for a role
+                            return role
+                
+                # If no splitter found but line looks like a role, return it
+                if 3 <= len(line.split()) <= 15:
+                    return line
+        
+        # Look for role in experience section
+        experience_markers = ['experience', 'employment', 'work history']
+        in_experience = False
+        for line in lines:
+            line = line.strip()
+            
+            # Check if we're in experience section
+            if any(marker in line.lower() for marker in experience_markers):
+                in_experience = True
+                continue
+            
+            if in_experience and line:
+                # Look for job titles (usually 2-5 words, capitalized)
+                words = line.split()
+                if 2 <= len(words) <= 5 and any(word[0].isupper() for word in words):
+                    return line
+        
+        return ""
 
-    def parse(self):
-        """Parse the resume document."""
-        logger.info(f"Starting to parse resume: {self.file_path}")
+    def parse(self, file_path: str) -> Dict[str, Any]:
+        """Parse an ATS resume file.
         
+        Args:
+            file_path: Path to the resume file
+            
+        Returns:
+            Dictionary containing parsed resume data
+        """
         try:
-            doc = Document(self.file_path)
+            # Parse the document
+            doc = Document(file_path)
+            text = "\n".join([p.text for p in doc.paragraphs])
+            
+            # Extract information
+            name = self._extract_name(text)
+            current_role = self._extract_role(text)
+            companies = self._extract_companies(text)
+            years_experience = self._extract_years_experience(text)
+            skills = self._extract_skills(text)
+            achievements = self._extract_achievements(text)
+            
+            # Clean and validate data
+            name = str(name).strip() if name else ""
+            current_role = str(current_role).strip() if current_role else ""
+            companies = [str(c).strip() for c in companies if c and str(c).strip()]
+            years_experience = float(years_experience) if years_experience else 0.0
+            skills = [str(s).strip() for s in skills if s and str(s).strip()]
+            achievements = [str(a).strip() for a in achievements if a and str(a).strip()]
+            
+            # Build result dictionary
+            result = {
+                'name': name,
+                'current_role': current_role,
+                'companies': companies,
+                'years_experience': years_experience,
+                'skills': skills,
+                'achievements': achievements
+            }
+            
+            # Log the parsed data
+            logger.info("Parsing complete. Final data:")
+            logger.info(f"Name: {result['name']}")
+            logger.info(f"Current_Role: {result['current_role']}")
+            logger.info(f"Companies: {result['companies']}")
+            logger.info(f"Years_Experience: {result['years_experience']}")
+            logger.info(f"Skills: {result['skills']}")
+            logger.info(f"Achievements: {result['achievements']}")
+            
+            return result
+            
         except Exception as e:
-            logger.error(f"Failed to open document: {e}")
+            logger.error(f"Error parsing resume: {e}")
             raise
-            
-        # Initialize data structure
-        data = {
-            'name': '',
-            'current_role': '',
-            'companies': [],
-            'years_experience': 0,
-            'skills': [],
-            'achievements': []
-        }
-        
-        # Track work experience dates for calculating total experience
-        work_dates = []
-        
-        # Parse each paragraph
-        for i, para in enumerate(doc.paragraphs):
-            text = self.clean_text(para.text)
-            if not text:
-                continue
-                
-            logger.debug(f"Processing paragraph {i}: '{text}'")
-            
-            # Skip contact info
-            if self.is_contact_info(text):
-                logger.debug("Skipping contact info")
-                continue
-                
-            # Extract name if not found (usually first non-empty line)
-            if not data['name'] and not any(x in text.lower() for x in ['summary', 'experience', 'education']):
-                data['name'] = text
-                logger.debug(f"Found name: {data['name']}")
-                continue
-            
-            # Extract company info
-            company_info = self.extract_company_info(text)
-            if company_info:
-                if company_info['company']:
-                    data['companies'].append(company_info['company'])
-                if not data['current_role']:
-                    data['current_role'] = self.extract_role(text)
-                if company_info['dates']:
-                    work_dates.append(company_info['dates'])
-                continue
-            
-            # Extract achievement
-            achievement = self.extract_achievement(text)
-            if achievement:
-                data['achievements'].append(achievement)
-                continue
-            
-            # Extract skills
-            skills = self.extract_skills(text)
-            if skills:
-                data['skills'].extend([s for s in skills if s not in data['skills']])
-        
-        # Calculate total years of experience
-        data['years_experience'] = self.calculate_years_experience(work_dates)
-        
-        # Log final parsed data
-        logger.info("Parsing complete. Final data:")
-        logger.info(f"Name: {data['name']}")
-        logger.info(f"Current Role: {data['current_role']}")
-        logger.info(f"Companies: {data['companies']}")
-        logger.info(f"Years Experience: {data['years_experience']}")
-        logger.info(f"Skills: {data['skills']}")
-        logger.info(f"Achievements: {data['achievements']}")
-        
-        return data
 
     def is_contact_info(self, text):
         """Check if text contains contact information."""
@@ -315,7 +453,7 @@ class ATSParser:
         paragraphs = [self.clean_text(para.text) for para in document.paragraphs if self.clean_text(para.text)]
         
         # Extract name
-        extracted_data['name'] = self.extract_name(paragraphs)
+        extracted_data['name'] = self._extract_name(paragraphs)
         
         work_dates = []
         current_section = ''
@@ -354,14 +492,14 @@ class ATSParser:
             if current_section == 'profile':
                 profile_text += ' ' + text
                 # Extract skills from profile
-                skills = self.extract_skills(text)
+                skills = self._extract_skills(text)
                 for skill in skills:
                     if skill not in extracted_data['skills']:
                         extracted_data['skills'].append(skill)
             
             elif current_section == 'experience':
                 if '|' in text:
-                    info = self.extract_company_info(text)
+                    info = self._extract_company_info(text)
                     if info:
                         if info['company'] and info['company'] not in extracted_data['companies']:
                             extracted_data['companies'].append(info['company'])
@@ -374,21 +512,21 @@ class ATSParser:
                             extracted_data['current_role'] = role
                     in_experience_details = True
                 elif in_experience_details:
-                    achievement = self.extract_achievement(text)
+                    achievement = self._extract_achievement(text)
                     if achievement and achievement not in extracted_data['achievements']:
                         extracted_data['achievements'].append(achievement)
                         # Extract skills from achievements
-                        skills = self.extract_skills(text)
+                        skills = self._extract_skills(text)
                         for skill in skills:
                             if skill not in extracted_data['skills']:
                                 extracted_data['skills'].append(skill)
             
             elif current_section == 'achievements':
-                achievement = self.extract_achievement(text)
+                achievement = self._extract_achievement(text)
                 if achievement and achievement not in extracted_data['achievements']:
                     extracted_data['achievements'].append(achievement)
                     # Extract skills from achievements
-                    skills = self.extract_skills(text)
+                    skills = self._extract_skills(text)
                     for skill in skills:
                         if skill not in extracted_data['skills']:
                             extracted_data['skills'].append(skill)
@@ -416,27 +554,6 @@ class ATSParser:
 
         return extracted_data
 
-    def extract_name(self, paragraphs):
-        """Extract name from text."""
-        logger.debug(f"Extracting name from paragraphs: {paragraphs}")
-        
-        # Common name patterns
-        name_patterns = [
-            r'^([A-Za-z\s]+)$',  # Simple name
-            r'^([A-Za-z\s]+),\s*([A-Za-z\s]+)$'  # Name with comma
-        ]
-        
-        for pattern in name_patterns:
-            for para in paragraphs:
-                match = re.search(pattern, para)
-                if match:
-                    name = match.group(0).strip()
-                    logger.debug(f"Found name: {name}")
-                    return name
-                
-        logger.debug("No name found")
-        return ''
-
     def is_education_related(self, text):
         """Check if text is related to education."""
         patterns = [
@@ -448,6 +565,7 @@ class ATSParser:
 # Example usage
 if __name__ == "__main__":
     file_path = 'src/templates/ATS classic HR resume.docx'
-    parser = ATSParser(file_path)
+    parser = ATSParser()
+    parser.file_path = file_path
     parsed_data = parser.parse_docx_to_json()
     print(json.dumps(parsed_data, indent=4))

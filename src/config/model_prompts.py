@@ -48,25 +48,28 @@ Create a summary that:
 4. Shows your expertise and impact"""
 
 # GPT2-specific prompt template
-GPT2_PROMPT = '''Generate a professional resume summary for:
+GPT2_PROMPT = """Generate a professional first-person summary that highlights expertise and achievements.
 
 Name: {name}
-Current Role: {role}
+Current Role: {current_role}
 Company: {company}
-Experience: {experience} years
-Key Achievements: {achievements}
+Experience: {years_experience} years
+Key Achievements:
+{achievements}
 Core Skills: {skills}
 
-Write a concise professional summary (3-4 sentences) that:
-1. Introduces you by name
-2. Describes your current role and experience
-3. Highlights your key achievements with metrics
-4. Showcases your most relevant skills
+Write a concise, professional summary that:
+1. Starts with "I am {name}"
+2. Highlights current role and experience
+3. Emphasizes key achievements with metrics
+4. Mentions relevant skills
+5. Uses a professional tone
+6. Focuses on concrete accomplishments
+7. Avoids generic statements
+8. Keeps to 3-4 sentences
 
-Example Output:
-"Hi, I am Sarah Chen. I am a Senior HR Manager at TechCorp with 8 years of experience in talent acquisition and employee development. I have successfully implemented performance management systems that improved employee retention by 25% and reduced hiring costs by 30%. My expertise includes HRIS implementation, policy development, and strategic workforce planning."
-
-Write a similar summary for the above person:'''
+Summary:
+I am"""
 
 # BART-specific prompt template
 BART_PROMPT = """Generate a concise professional summary in first person:

@@ -58,66 +58,44 @@ def parse_arguments():
     return args
 
 def main():
-    """Main function to generate summaries."""
+    """Main function."""
     try:
-        # Parse arguments
+        # Parse command line arguments
         args = parse_arguments()
         logger.info(f"Starting summary generation with args: {args}")
         
-        # Set logging level
-        if args.debug:
-            logging.getLogger().setLevel(logging.DEBUG)
-            logger.debug("Debug logging enabled")
-        
         # Validate input file
-        input_path = Path(args.input_file)
-        if not input_path.exists():
-            logger.error(f"Input file not found: {input_path}")
-            raise FileNotFoundError(f"Input file not found: {input_path}")
+        if not os.path.exists(args.input_file):
+            logger.error(f"Input file not found: {args.input_file}")
+            raise FileNotFoundError(f"Input file not found: {args.input_file}")
             
-        logger.info(f"Processing resume file: {input_path}")
+        # Get absolute path
+        input_file = os.path.abspath(args.input_file)
+        logger.info(f"Processing resume file: {input_file}")
         
         # Create parser
-        try:
-            parser = ParserFactory.create_parser(args.parser, input_path)
-            logger.debug(f"Created parser: {parser.__class__.__name__}")
-        except Exception as e:
-            logger.error(f"Failed to create parser: {e}")
-            raise
-            
+        parser = ParserFactory.create_parser(args.parser, input_file)
+        logger.info(f"Created parser of type '{args.parser}' for file: {input_file}")
+        
         # Parse resume
-        try:
-            resume_data = parser.parse()
-            logger.debug(f"Parsed resume data: {resume_data}")
-        except Exception as e:
-            logger.error(f"Failed to parse resume: {e}")
-            raise
-            
+        resume_data = parser.parse(input_file)
+        if not resume_data:
+            logger.error("Failed to parse resume data")
+            raise ValueError("Failed to parse resume data")
+        
         # Create model
-        try:
-            model = EnhancedModelFactory.create_model(
-                model_type=args.model,
-                enhancer_type=args.enhancer
-            )
-            logger.debug(f"Created model: {model.__class__.__name__}")
-        except Exception as e:
-            logger.error(f"Failed to create model: {e}")
-            raise
-            
+        model = EnhancedModelFactory.create_model(
+            model_type=args.model,
+            enhancer_type=args.enhancer
+        )
+        
         # Generate summary
-        try:
-            summary = model.generate_summary(resume_data)
-            logger.info("Successfully generated summary")
-            logger.debug(f"Generated summary: {summary}")
-            
-            print("\nGenerated Summary:")
-            print("-----------------")
-            print(summary)
-            
-        except Exception as e:
-            logger.error(f"Failed to generate summary: {e}")
-            raise
-            
+        summary = model.generate_summary(resume_data)
+        
+        # Print summary
+        print("\nGenerated Summary:\n-----------------")
+        print(summary)
+        
     except Exception as e:
         logger.error(f"Error in main: {e}")
         raise

@@ -1,227 +1,223 @@
-from docx import Document
-from datetime import datetime
+"""Parser for industry manager resumes."""
+import logging
 import re
+from datetime import datetime
+from typing import List, Dict, Any
+from docx import Document
 
-# move all methods into a class
-class IndustryManagerParser:
+from .base_parser import BaseParser
+
+logger = logging.getLogger(__name__)
+
+
+class IndustryManagerParser(BaseParser):
+    """Parser for industry manager resumes."""
     
-    def __init__(self, docx_file):
-        self.docx_file = docx_file
+    def __init__(self):
+        """Initialize industry manager parser."""
+        super().__init__()
     
-    def clean_text(self, text):
-        """Clean and normalize text."""
-        if not text:
-            return ''
-        text = re.sub(r'\s+', ' ', text)
-        return text.strip()
-
-    def is_contact_info(self, text):
-        """Check if text contains contact information."""
-        patterns = [
-            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',  # Email
-            r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',  # Phone
-            r'\b\d+\s+[A-Za-z\s,]+\b[A-Z]{2}\b\s+\d{5}\b',  # Address
-        ]
-        return any(re.search(pattern, text) for pattern in patterns)
-
-    def extract_achievement(self, text):
-        """Extract achievement from text."""
-        achievement_indicators = [
-        r'\b\d+%\b',  # Percentage improvements
-        r'\$\d+',     # Dollar amounts
-        r'\bincreased\b',
-        r'\bimproved\b',
-        r'\breduced\b',
-        r'\bsaved\b',
-        r'\bgenerated\b',
-        r'\bmanaged\b',
-        r'\bled\b',
-        r'\bdeveloped\b'
-        ]
-    
-        if any(re.search(indicator, text.lower()) for indicator in achievement_indicators):
-            return self.clean_text(text)
-        return None
-
-    def is_education_related(self, text):
-        """Check if text is related to education."""
-        education_keywords = [
-            'bachelor', 'master', 'phd', 'degree', 'diploma',
-            'certification', 'university', 'college', 'school',
-            'gpa', 'major', 'minor'
-        ]
-        return any(keyword in text.lower() for keyword in education_keywords)
-
-    def extract_name_from_contact(self, text):
-        """Extract name from contact information, particularly from email."""
-        # Look for email pattern
-        email_match = re.search(r'([a-zA-Z0-9._%+-]+)@[a-zA-Z0-9.-]+\.[A-Z|a-z]{2,}', text)
-        if email_match:
-            email_prefix = email_match.group(1)
-            # Handle common email formats like m.riley, riley.m, mriley
-            parts = re.split(r'[._]', email_prefix)
-            if len(parts) >= 2:
-                # Try to determine which part is first name and which is last name
-                for part in parts:
-                    if len(part) > 1:  # Assume longer part is the last name
-                        return f"{parts[0].title()} {part.title()}"
-        return ''
-
-    def parse_docx_to_json(self):
-        """Parse a .docx file to extract structured data into JSON format."""
+    def parse(self, file_path: str) -> Dict[str, Any]:
+        """Parse an industry manager resume file.
         
-        extracted_data = {
-            'name': '',
-            'current_role': '',
-            'years_experience': 0,
-            'companies': [],
-            'achievements': [],
-            'skills': [],
-            'education': [],
-            'recognition': ''
-        }
-
-        document = Document(self.docx_file)
-        
-        # First pass: Extract name and role
-        paragraphs = [self.clean_text(para.text) for para in document.paragraphs if self.clean_text(para.text)]
-        
-        # Extract name from contact information
-        for para in paragraphs[:3]:  # Usually contact info is in first few paragraphs
-            if self.is_contact_info(para):
-                name = self.extract_name_from_contact(para)
-                if name:
-                    extracted_data['name'] = name
-                break
-
-        current_section = ''
-        in_experience_details = False
-        in_profile = False
-        profile_text = []
-        
-        for para in document.paragraphs:
-            text = self.clean_text(para.text)
-            if not text:
-                continue
-
-            lower_text = text.lower()
-
-            # Section detection
-            if text.lower() == 'profile':
-                current_section = 'profile'
-                in_profile = True
-                continue
-            elif any(section in lower_text for section in ['experience', 'employment', 'work history']) and len(text) < 30:
-                current_section = 'experience'
-                in_experience_details = False
-                in_profile = False
-                continue
-            elif any(section in lower_text for section in ['achievement', 'accomplishment']) and len(text) < 30:
-                current_section = 'achievements'
-                in_profile = False
-                continue
-            elif 'technical skills' in lower_text and len(text) < 30:
-                current_section = 'skills'
-                in_profile = False
-                continue
-            elif 'education' in lower_text and len(text) < 30:
-                current_section = 'education'
-                in_profile = False
-                continue
-            elif any(section in lower_text for section in ['recognition', 'award', 'honor']) and len(text) < 30:
-                current_section = 'recognition'
-                in_profile = False
-                continue
-            elif 'interests' in lower_text and len(text) < 30:
-                current_section = 'interests'
-                in_profile = False
-                continue
-
-            # Process sections
-            if current_section == 'profile':
-                if text.lower() != 'profile':
-                    profile_text.append(text)
+        Args:
+            file_path: Path to the resume file
             
-            elif current_section == 'experience':
-                if '|' in text:
-                    parts = [p.strip() for p in text.split('|')]
-                    if len(parts) >= 2:
-                        company = parts[1]
-                        company = self.clean_text(company)
-                        if company and company not in extracted_data['companies']:
-                            extracted_data['companies'].append(company)
-                        # Try to extract role from the first part
-                        if parts[0] and not extracted_data['current_role']:
-                            role = self.clean_text(parts[0])
-                            if 'manager' in role.lower():
-                                extracted_data['current_role'] = role
-                    in_experience_details = True
-                elif in_experience_details:
-                    achievement = self.extract_achievement(text)
-                    if achievement and achievement not in extracted_data['achievements']:
-                        extracted_data['achievements'].append(achievement)
+        Returns:
+            Dictionary containing parsed resume data
+        """
+        try:
+            # Read document
+            doc = Document(file_path)
+            text = "\n".join([p.text for p in doc.paragraphs])
             
-            elif current_section == 'achievements':
-                achievement = self.extract_achievement(text)
-                if achievement and achievement not in extracted_data['achievements']:
-                    extracted_data['achievements'].append(achievement)
+            # Extract information
+            name = self._extract_name(text)
+            current_role = self._extract_role(text)
+            companies = self._extract_companies(text)
+            years_experience = self._extract_years_experience(text)
+            skills = self._extract_skills(text)
+            achievements = self._extract_achievements(text)
             
-            elif current_section == 'skills':
-                if not any(word in lower_text for word in ['section', 'skill', 'proficiency']):
-                    skills = re.split(r'[•·,\u2022]|\band\b', text)
-                    for skill in skills:
-                        skill = self.clean_text(skill)
-                        if (skill and len(skill) > 2 and 
-                            not any(c.isdigit() for c in skill) and
-                            not any(word in skill.lower() for word in ['activities', 'interests', 'theater', 'art', 'hiking', 'skiing', 'travel'])):
-                            if skill not in extracted_data['skills']:
-                                extracted_data['skills'].append(skill)
+            # Clean and validate data
+            name = str(name).strip() if name else ""
+            current_role = str(current_role).strip() if current_role else ""
+            companies = [str(c).strip() for c in companies if c and str(c).strip()]
+            years_experience = float(years_experience) if years_experience else 0.0
+            skills = [str(s).strip() for s in skills if s and str(s).strip()]
+            achievements = [str(a).strip() for a in achievements if a and str(a).strip()]
             
-            elif current_section == 'education':
-                if self.is_education_related(text):
-                    if '|' in text:
-                        parts = [p.strip() for p in text.split('|')]
-                        education = next((p for p in parts if self.is_education_related(p)), None)
-                        if education and education not in extracted_data['education']:
-                            extracted_data['education'].append(education)
-                    else:
-                        education = self.clean_text(text)
-                        if education and education not in extracted_data['education']:
-                            extracted_data['education'].append(education)
-            
-            elif current_section == 'recognition':
-                if not any(word in text.lower() for word in ['section', 'recognition', 'awards']):
-                    if text not in extracted_data['recognition']:
-                        extracted_data['recognition'] = text if not extracted_data['recognition'] else extracted_data['recognition'] + '; ' + text
-
-        # Calculate experience based on January 2019 to present
-        start_date = datetime(2019, 1, 1)  # January 2019
-        end_date = datetime.now()
-        years = (end_date - start_date).days / 365.25
-        extracted_data['years_experience'] = round(years)
-
-        # Extract skills from profile and achievements if none found
-        if not extracted_data['skills']:
-            # Look for skill keywords in profile and achievements
-            skill_keywords = {
-                'staff training': ['training', 'staff development'],
-                'customer service': ['customer', 'service'],
-                'team leadership': ['leader', 'leadership', 'team'],
-                'food & beverage': ['food', 'beverage', 'restaurant'],
-                'cost control': ['cost', 'efficiency', 'budget'],
-                'social media': ['social media', 'marketing']
+            # Build result dictionary
+            result = {
+                'name': name,
+                'current_role': current_role,
+                'companies': companies,
+                'years_experience': years_experience,
+                'skills': skills,
+                'achievements': achievements
             }
             
-            text_to_search = ' '.join(profile_text + extracted_data['achievements']).lower()
-            for skill, keywords in skill_keywords.items():
-                if any(keyword in text_to_search for keyword in keywords):
-                    extracted_data['skills'].append(skill.title())
-
-        return extracted_data
+            # Log the parsed data
+            logger.info("Parsing complete. Final data:")
+            logger.info(f"Name: {result['name']}")
+            logger.info(f"Current_Role: {result['current_role']}")
+            logger.info(f"Companies: {result['companies']}")
+            logger.info(f"Years_Experience: {result['years_experience']}")
+            logger.info(f"Skills: {result['skills']}")
+            logger.info(f"Achievements: {result['achievements']}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error parsing resume: {e}")
+            raise
+    
+    def _extract_name(self, text: str) -> str:
+        """Extract name from text."""
+        # Look for name at the start of the document
+        lines = text.split('\n')
+        for line in lines[:3]:  # Check first 3 lines
+            # Look for capitalized words that could be a name
+            words = line.strip().split()
+            if len(words) >= 2 and all(w[0].isupper() for w in words if w):
+                return line.strip()
+        return ""
+    
+    def _extract_role(self, text: str) -> str:
+        """Extract current role from text."""
+        role_patterns = [
+            r'(?i)current role:\s*([^\n]+)',
+            r'(?i)position:\s*([^\n]+)',
+            r'(?i)title:\s*([^\n]+)',
+        ]
+        
+        for pattern in role_patterns:
+            match = re.search(pattern, text)
+            if match:
+                return match.group(1).strip()
+        
+        # Look for role in first section
+        lines = text.split('\n')
+        for line in lines[1:5]:  # Check lines 2-5
+            if any(x in line.lower() for x in ['manager', 'director', 'lead', 'head']):
+                return line.strip()
+        
+        return ""
+    
+    def _extract_companies(self, text: str) -> List[str]:
+        """Extract companies from text."""
+        companies = []
+        
+        # Look for company sections
+        company_patterns = [
+            r'(?i)company:\s*([^\n]+)',
+            r'(?i)employer:\s*([^\n]+)',
+            r'(?i)organization:\s*([^\n]+)',
+            r'\b[A-Z][a-zA-Z\s&]+(?:Inc\.|LLC|Ltd\.|Corp\.|Corporation|Company)\b'
+        ]
+        
+        for pattern in company_patterns:
+            matches = re.finditer(pattern, text)
+            for match in matches:
+                company = match.group(1).strip() if len(match.groups()) > 0 else match.group(0)
+                if company and company not in companies:
+                    companies.append(company)
+        
+        return companies[:3]  # Return top 3 companies
+    
+    def _extract_years_experience(self, text: str) -> float:
+        """Extract years of experience from text."""
+        # Look for explicit mentions of years
+        year_patterns = [
+            r'(?i)(\d+)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?experience',
+            r'(?i)experience:\s*(\d+)\+?\s*(?:years?|yrs?)',
+        ]
+        
+        for pattern in year_patterns:
+            match = re.search(pattern, text)
+            if match:
+                try:
+                    return float(match.group(1))
+                except ValueError:
+                    continue
+        
+        # Calculate from employment dates
+        date_pattern = r'(?i)(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}'
+        dates = re.findall(date_pattern, text)
+        if len(dates) >= 2:
+            try:
+                dates = [datetime.strptime(d, '%B %Y') for d in dates]
+                years = (max(dates) - min(dates)).days / 365.25
+                return round(years, 1)
+            except ValueError:
+                pass
+        
+        return 0.0  # Default if no experience found
+    
+    def _extract_skills(self, text: str) -> List[str]:
+        """Extract skills from text."""
+        skills = set()
+        
+        # Look for skills section
+        skills_section = re.search(r'(?i)skills[:\n]+(.*?)(?:\n\n|\Z)', text, re.DOTALL)
+        if skills_section:
+            # Split by common delimiters
+            skill_text = skills_section.group(1)
+            skill_list = re.split(r'[,;•|\n]', skill_text)
+            
+            # Clean and add skills
+            for skill in skill_list:
+                skill = skill.strip()
+                if skill and len(skill) > 2:  # Ignore very short skills
+                    skills.add(skill)
+        
+        # Look for key technical terms
+        technical_terms = [
+            'management', 'leadership', 'strategy', 'operations',
+            'business development', 'sales', 'marketing', 'finance',
+            'analytics', 'project management', 'team building'
+        ]
+        
+        for term in technical_terms:
+            if term.lower() in text.lower():
+                skills.add(term)
+        
+        return list(skills)
+    
+    def _extract_achievements(self, text: str) -> List[str]:
+        """Extract achievements from text."""
+        achievements = []
+        
+        # Look for achievements section
+        achievement_section = re.search(r'(?i)(?:achievements?|accomplishments?)[:\n]+(.*?)(?:\n\n|\Z)', text, re.DOTALL)
+        if achievement_section:
+            # Split by bullet points or newlines
+            achievement_text = achievement_section.group(1)
+            achievement_list = re.split(r'[•\n]', achievement_text)
+            
+            # Clean and filter achievements
+            for achievement in achievement_list:
+                achievement = achievement.strip()
+                if achievement and len(achievement) > 20:  # Ignore short lines
+                    if any(x in achievement.lower() for x in ['increased', 'decreased', 'improved', 'led', 'managed', 'developed']):
+                        achievements.append(achievement)
+        
+        # Look for achievements in experience section
+        experience_section = re.search(r'(?i)experience[:\n]+(.*?)(?:\n\n|\Z)', text, re.DOTALL)
+        if experience_section:
+            lines = experience_section.group(1).split('\n')
+            for line in lines:
+                line = line.strip()
+                if line and len(line) > 20:
+                    if any(x in line.lower() for x in ['increased', 'decreased', 'improved', 'led', 'managed', 'developed']):
+                        if any(x in line for x in ['%', '$', '+', 'million', 'billion']):
+                            achievements.append(line)
+        
+        return achievements[:5]  # Return top 5 achievements
 
 if __name__ == "__main__":
     import json
     file_path = "src/templates/Industry manager resume.docx"
-    parser = IndustryManagerParser(file_path)
-    result = parser.parse_docx_to_json()
+    parser = IndustryManagerParser()
+    result = parser.parse(file_path)
     print(json.dumps(result, indent=4))
