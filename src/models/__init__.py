@@ -1,5 +1,5 @@
 """Models package."""
-from .model_factory import ResumeModelFactory
-from .enhanced_model_factory import EnhancedModelFactory
+from .model_factory import create_model
+from .gpt2_model import GPT2Model
 
-__all__ = ['ResumeModelFactory', 'EnhancedModelFactory']
+__all__ = ['create_model', 'GPT2Model']

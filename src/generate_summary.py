@@ -13,7 +13,7 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-from models.enhanced_model_factory import EnhancedModelFactory
+from models.model_factory import create_model
 from parsers.parser_factory import ParserFactory
 
 # Set up logging with more detailed format
@@ -42,11 +42,6 @@ def parse_arguments():
         choices=["ats", "industry"],
         default="ats",
         help="Parser to use for resume"
-    )
-    parser.add_argument(
-        "--enhancer",
-        choices=["few_shot", "cot", "rag"],
-        help="Optional enhancer to use"
     )
     parser.add_argument(
         "--debug",
@@ -84,17 +79,20 @@ def main():
             raise ValueError("Failed to parse resume data")
         
         # Create model
-        model = EnhancedModelFactory.create_model(
-            model_type=args.model,
-            enhancer_type=args.enhancer
-        )
+        try:
+            model = create_model(args.model)
+        except Exception as e:
+            logger.error(f"Error creating model: {e}")
+            sys.exit(1)
         
         # Generate summary
-        summary = model.generate_summary(resume_data)
-        
-        # Print summary
-        print("\nGenerated Summary:\n-----------------")
-        print(summary)
+        try:
+            summary = model.generate_summary(resume_data)
+            print("\nGenerated Summary:\n-----------------")
+            print(summary)
+        except Exception as e:
+            logger.error(f"Error generating summary: {e}")
+            sys.exit(1)
         
     except Exception as e:
         logger.error(f"Error in main: {e}")
