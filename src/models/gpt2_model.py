@@ -19,6 +19,9 @@ class GPT2ResumeModel(BaseResumeModel):
             cache_dir=cache_dir,
             local_files_only=cache_dir is not None
         )
+        # Set pad token to eos_token
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
         
         self.model = GPT2LMHeadModel.from_pretrained(
             self.model_name,
@@ -42,11 +45,22 @@ class GPT2ResumeModel(BaseResumeModel):
             
             # Generate prompt
             prompt = self.generate_prompt(formatted_data)
-            inputs = self.tokenizer.encode(prompt, return_tensors="pt")
+            inputs = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+            
+            # Generate summary
+            #outputs = self.model.generate(
+            #    inputs,
+            #    **self.get_generation_config()
+            #)
+
+            # Pass attention mask and input IDs to the model
+            input_ids = inputs["input_ids"]
+            attention_mask = inputs["attention_mask"]
             
             # Generate summary
             outputs = self.model.generate(
-                inputs,
+                input_ids,
+                attention_mask=attention_mask,  # Pass the attention mask
                 **self.get_generation_config()
             )
             
