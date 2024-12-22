@@ -8,9 +8,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from src.parsers.ats_parser import ATSParser
-from src.parsers.industry_manager_parser import IndustryManagerParser
-from src.generate_summary import select_model, ResumeModelFactory
+from models.model_factory import ResumeModelFactory
+from parsers.ats_parser import ATSParser
+from parsers.industry_manager_parser import IndustryManagerParser
+from config.app_config import UI_CONFIG
 
 def load_css():
     st.markdown("""
@@ -323,6 +324,10 @@ def main():
     
     load_css()
     
+    # Initialize session state for storing the generated summary
+    if 'generated_summary' not in st.session_state:
+        st.session_state.generated_summary = ""
+    
     # Modern header with gradient
     st.markdown("""
         <div class="header-container">
@@ -332,7 +337,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # Create two columns with better spacing
-    col1, col2 = st.columns([2, 1], gap="large")
+    col1, col2 = st.columns(UI_CONFIG['layout']['column_ratios']['main_content'], gap="large")
     
     with col1:
         with st.container():
@@ -396,25 +401,14 @@ def main():
         st.markdown('<h2 class="step-header">Step 3: Select AI Model</h2>', unsafe_allow_html=True)
         with st.container():
             st.markdown('<div class="section-container">', unsafe_allow_html=True)
-            model_options = {
-                "T5 Model (Fast & Efficient)": ("t5", "base"),
-                "GPT-2 Model (Creative)": ("gpt2", "medium"),
-                "BART Model (Detailed)": ("bart", "large")
-            }
             
             selected_model = st.selectbox(
                 "Choose your preferred AI model:",
-                list(model_options.keys()),
+                list(UI_CONFIG['models'].keys()),
                 help="Each model has its own strengths"
             )
             
-            # Add model descriptions
-            model_descriptions = {
-                "T5 Model (Fast & Efficient)": "Best for quick, concise summaries",
-                "GPT-2 Model (Creative)": "Good for creative and engaging summaries",
-                "BART Model (Detailed)": "Ideal for detailed, comprehensive summaries"
-            }
-            st.info(f"💡 {model_descriptions[selected_model]}")
+            st.info(f"💡 {UI_CONFIG['models'][selected_model]['description']}")
             st.markdown('</div>', unsafe_allow_html=True)
     
     # Generate Summary Button (Full Width)
@@ -436,23 +430,73 @@ def main():
                 
                 # Generate summary using the selected model
                 factory = ResumeModelFactory()
-                model_type, model_size = model_options[selected_model]
-                model = factory.create_model(model_type, model_size)
-                summary = model.generate_summary(input_data)
-                
-                # Display summary
-                st.markdown('<h3 style="color: #4CAF50; margin-top: 2rem;">✨ Generated Summary</h3>', unsafe_allow_html=True)
-                st.markdown(f"""
-                    <div class="output-container">
-                        <p>{summary}</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                model_config = UI_CONFIG['models'][selected_model]
+                model = factory.create_model(model_config['type'], model_config['size'])
+                st.session_state.generated_summary = model.generate_summary(input_data)
                 
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
-                st.exception(e)
+                if st.checkbox("Show detailed error"):
+                    st.exception(e)
     elif uploaded_file is None and st.button("🚀 Generate Professional Summary"):
         st.warning("⚠️ Please upload your resume first!")
+    
+    # Display summary section (always show if there's a generated summary)
+    if st.session_state.generated_summary:
+        st.markdown('<h3 style="color: #4CAF50; margin-top: 2rem;">✨ Generated Summary</h3>', unsafe_allow_html=True)
+        
+        # Add custom CSS for the text area
+        text_area_config = UI_CONFIG['layout']['text_area']
+        st.markdown(f"""
+            <style>
+            .stTextArea textarea {{
+                font-family: {text_area_config['font_family']};
+                font-size: {text_area_config['font_size']};
+                line-height: {text_area_config['line_height']};
+                padding: 1rem;
+                background-color: var(--surface);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 0.5rem;
+                min-height: {text_area_config['min_height']}px;
+            }}
+            .stTextArea textarea:focus {{
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Editable text area for the summary
+        edited_summary = st.text_area(
+            "Edit your summary:",
+            value=st.session_state.generated_summary,
+            height=text_area_config['default_height'],
+            label_visibility="collapsed"
+        )
+        
+        # Action buttons in columns
+        col1, col2, col3 = st.columns(UI_CONFIG['layout']['column_ratios']['action_buttons'])
+        with col1:
+            if st.button("📋 Copy to Clipboard"):
+                st.write('<script>navigator.clipboard.writeText(`' + edited_summary + '`);</script>', unsafe_allow_html=True)
+                st.success("✅ Copied to clipboard!")
+        
+        with col2:
+            # Download button for the edited summary
+            st.download_button(
+                label="📥 Download Summary",
+                data=edited_summary,
+                file_name="professional_summary.txt",
+                mime="text/plain",
+                key="summary_download"
+            )
+        
+        with col3:
+            # Word count and character count
+            word_count = len(edited_summary.split())
+            char_count = len(edited_summary)
+            st.markdown(f"**Word count:** {word_count} | **Character count:** {char_count}")
 
 if __name__ == "__main__":
     main()
