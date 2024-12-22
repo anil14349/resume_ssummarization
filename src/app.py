@@ -11,6 +11,7 @@ sys.path.append(parent_dir)
 from models.model_factory import ResumeModelFactory
 from parsers.ats_parser import ATSParser
 from parsers.industry_manager_parser import IndustryManagerParser
+from evaluation.metrics import SummaryEvaluator
 from config.app_config import UI_CONFIG
 
 def load_css():
@@ -324,9 +325,11 @@ def main():
     
     load_css()
     
-    # Initialize session state for storing the generated summary
+    # Initialize session state
     if 'generated_summary' not in st.session_state:
         st.session_state.generated_summary = ""
+    if 'evaluation_scores' not in st.session_state:
+        st.session_state.evaluation_scores = None
     
     # Modern header with gradient
     st.markdown("""
@@ -434,6 +437,15 @@ def main():
                 model = factory.create_model(model_config['type'], model_config['size'])
                 st.session_state.generated_summary = model.generate_summary(input_data)
                 
+                # Evaluate the generated summary
+                evaluator = SummaryEvaluator()
+                reference_summary = input_data.get('reference_summary', '')  # Get reference if available
+                st.session_state.evaluation_scores = evaluator.evaluate_summary(
+                    st.session_state.generated_summary,
+                    reference_summary,
+                    input_data
+                )
+                
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
                 if st.checkbox("Show detailed error"):
@@ -464,6 +476,22 @@ def main():
                 border-color: var(--primary);
                 box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
             }}
+            .metric-card {{
+                background: var(--surface);
+                padding: 1rem;
+                border-radius: 0.5rem;
+                border: 1px solid var(--border);
+                margin: 0.5rem 0;
+            }}
+            .metric-value {{
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: var(--primary);
+            }}
+            .metric-label {{
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+            }}
             </style>
         """, unsafe_allow_html=True)
         
@@ -474,6 +502,60 @@ def main():
             height=text_area_config['default_height'],
             label_visibility="collapsed"
         )
+        
+        # Display evaluation metrics if available
+        if st.session_state.evaluation_scores:
+            st.markdown('<h3 style="margin-top: 2rem;">📊 Quality Metrics</h3>', unsafe_allow_html=True)
+            
+            metrics_col1, metrics_col2 = st.columns(2)
+            
+            with metrics_col1:
+                st.markdown("#### Content Quality")
+                st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">{:.2f}</div>
+                        <div class="metric-label">Content Similarity</div>
+                    </div>
+                """.format(st.session_state.evaluation_scores['content_similarity']), unsafe_allow_html=True)
+                
+                st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">{:.2f}</div>
+                        <div class="metric-label">ROUGE-1 Score</div>
+                    </div>
+                """.format(st.session_state.evaluation_scores['rouge1_f']), unsafe_allow_html=True)
+                
+                st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">{:.2f}</div>
+                        <div class="metric-label">ROUGE-L Score</div>
+                    </div>
+                """.format(st.session_state.evaluation_scores['rougeL_f']), unsafe_allow_html=True)
+            
+            with metrics_col2:
+                st.markdown("#### Readability Metrics")
+                st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">{:.1f}</div>
+                        <div class="metric-label">Avg. Sentence Length</div>
+                    </div>
+                """.format(st.session_state.evaluation_scores['avg_sentence_length']), unsafe_allow_html=True)
+                
+                st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">{:.2f}</div>
+                        <div class="metric-label">Sentiment Score</div>
+                        <div class="metric-desc">(-1 negative to +1 positive)</div>
+                    </div>
+                """.format(st.session_state.evaluation_scores['sentiment_score']), unsafe_allow_html=True)
+                
+                st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">{:.2f}</div>
+                        <div class="metric-label">Objectivity Score</div>
+                        <div class="metric-desc">(0 subjective to 1 objective)</div>
+                    </div>
+                """.format(1 - st.session_state.evaluation_scores['subjectivity_score']), unsafe_allow_html=True)
         
         # Action buttons in columns
         col1, col2, col3 = st.columns(UI_CONFIG['layout']['column_ratios']['action_buttons'])
