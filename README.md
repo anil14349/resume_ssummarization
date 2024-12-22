@@ -251,286 +251,55 @@ class CleanupTrainer:
         """
 ```
 
-## Deployment Guide
+## Deployment
 
-### Docker Deployment
+### CI/CD Pipeline
 
-1. **Build Docker Image**
-```dockerfile
-# Dockerfile
-FROM pytorch/pytorch:1.9.0-cuda11.1-cudnn8-runtime
+This project uses GitHub Actions for continuous integration and deployment. The pipeline includes:
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+1. **Testing**: Runs tests and linting on Python 3.8 and 3.9
+2. **Building**: Builds Docker image and pushes to Docker Hub
+3. **Deployment**: Deploys to Kubernetes cluster
 
-# Copy application code
-COPY . /app
-WORKDIR /app
+### Prerequisites for Deployment
 
-# Set environment variables
-ENV MODEL_PATH=/app/models
-ENV CUDA_VISIBLE_DEVICES=0
+1. Docker Hub account
+2. Kubernetes cluster
+3. GitHub repository secrets:
+   - `DOCKER_HUB_USERNAME`
+   - `DOCKER_HUB_TOKEN`
+   - `KUBE_CONFIG`
 
-# Expose port
-EXPOSE 8000
+### Local Development
 
-# Run application
-CMD ["python", "src/app.py"]
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/tv3.git
+cd tv3
 ```
 
-2. **Build and Run**
+2. Install dependencies:
 ```bash
-# Build image
-docker build -t resume-summary-generator .
+pip install -r requirements.txt
+```
 
-# Run container
-docker run -d \
-    -p 8000:8000 \
-    -v /path/to/models:/app/models \
-    --gpus all \
-    resume-summary-generator
+### Docker Build
+
+Build the Docker image locally:
+```bash
+docker build -t resume-summary .
+```
+
+Run the container:
+```bash
+docker run -p 8000:8000 resume-summary
 ```
 
 ### Kubernetes Deployment
 
-1. **Create Deployment**
-```yaml
-# deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: resume-summary
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: resume-summary
-  template:
-    metadata:
-      labels:
-        app: resume-summary
-    spec:
-      containers:
-      - name: resume-summary
-        image: resume-summary-generator:latest
-        ports:
-        - containerPort: 8000
-        resources:
-          limits:
-            nvidia.com/gpu: 1
-        volumeMounts:
-        - name: models
-          mountPath: /app/models
-      volumes:
-      - name: models
-        persistentVolumeClaim:
-          claimName: models-pvc
-```
-
-2. **Create Service**
-```yaml
-# service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: resume-summary
-spec:
-  selector:
-    app: resume-summary
-  ports:
-  - port: 80
-    targetPort: 8000
-  type: LoadBalancer
-```
-
-3. **Deploy**
+Apply the Kubernetes configurations:
 ```bash
-kubectl apply -f deployment.yaml
-kubectl apply -f service.yaml
-```
-
-### Cloud Deployment (AWS)
-
-1. **Build for Lambda**
-```python
-# lambda_function.py
-import json
-from src.generate_summary import generate_summary
-
-def lambda_handler(event, context):
-    try:
-        body = json.loads(event['body'])
-        resume_text = body['resume']
-        
-        summary = generate_summary(resume_text)
-        
-        return {
-            'statusCode': 200,
-            'body': json.dumps({'summary': summary})
-        }
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }
-```
-
-2. **Create API Gateway**
-```bash
-# Create REST API
-aws apigateway create-rest-api \
-    --name "ResumeSummaryAPI" \
-    --region us-west-2
-
-# Create resource and method
-aws apigateway create-resource \
-    --rest-api-id <api-id> \
-    --parent-id <parent-id> \
-    --path-part "generate"
-
-aws apigateway put-method \
-    --rest-api-id <api-id> \
-    --resource-id <resource-id> \
-    --http-method POST \
-    --authorization-type NONE
-```
-
-3. **Deploy with CloudFormation**
-```yaml
-# template.yaml
-AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-
-Resources:
-  ResumeSummaryFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: lambda_function.lambda_handler
-      Runtime: python3.8
-      MemorySize: 3008
-      Timeout: 30
-      Events:
-        Api:
-          Type: Api
-          Properties:
-            Path: /generate
-            Method: POST
-```
-
-## Additional Cloud Deployments
-
-### Google Cloud Platform (GCP)
-
-1. **Cloud Run Deployment**
-```dockerfile
-# Dockerfile.gcp
-FROM pytorch/pytorch:1.9.0-cuda11.1-cudnn8-runtime
-
-# Install dependencies
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-# Copy application code
-COPY . /app
-WORKDIR /app
-
-# Set environment variables
-ENV PORT=8080
-
-# Run with gunicorn
-CMD exec gunicorn --bind :$PORT src.app:app
-```
-
-```bash
-# Build and deploy
-gcloud builds submit --tag gcr.io/PROJECT_ID/resume-summary
-gcloud run deploy resume-summary \
-    --image gcr.io/PROJECT_ID/resume-summary \
-    --platform managed \
-    --memory 2Gi \
-    --cpu 2
-```
-
-2. **AI Platform**
-```yaml
-# config.yaml
-trainingInput:
-  scaleTier: CUSTOM
-  masterType: n1-highmem-8
-  masterConfig:
-    acceleratorConfig:
-      count: 1
-      type: NVIDIA_TESLA_T4
-  hyperparameters:
-    goal: MAXIMIZE
-    hyperparameterMetricTag: val_rouge_l
-    maxTrials: 50
-    maxParallelTrials: 3
-```
-
-```bash
-# Submit training job
-gcloud ai-platform jobs submit training cleanup_job \
-    --config config.yaml \
-    --package-path src/ \
-    --module-name training.train_cleanup \
-    --region us-central1 \
-    --runtime-version 2.6 \
-    --python-version 3.8
-```
-
-### Microsoft Azure
-
-1. **Azure Container Instances**
-```bash
-# Create container
-az container create \
-    --resource-group myResourceGroup \
-    --name resume-summary \
-    --image resume-summary:latest \
-    --cpu 2 \
-    --memory 4 \
-    --registry-login-server myregistry.azurecr.io \
-    --registry-username <username> \
-    --registry-password <password> \
-    --dns-name-label resume-summary \
-    --ports 80
-```
-
-2. **Azure ML Service**
-```python
-# azure_deploy.py
-from azureml.core import Workspace, Environment, Model
-from azureml.core.model import InferenceConfig
-from azureml.core.webservice import AciWebservice
-
-# Configure workspace
-ws = Workspace.from_config()
-
-# Create environment
-env = Environment.from_pip_requirements("resume-env", "requirements.txt")
-
-# Create inference config
-inference_config = InferenceConfig(
-    entry_script="src/deploy/score.py",
-    environment=env
-)
-
-# Deploy to ACI
-aci_config = AciWebservice.deploy_configuration(
-    cpu_cores=2,
-    memory_gb=4,
-    auth_enabled=True
-)
-
-service = Model.deploy(
-    ws,
-    "resume-summary",
-    [model],
-    inference_config,
-    aci_config
-)
+kubectl apply -f k8s/
 ```
 
 ## Performance Optimization

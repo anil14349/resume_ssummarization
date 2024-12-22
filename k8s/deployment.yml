@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resume-summary
+  labels:
+    app: resume-summary
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: resume-summary
+  template:
+    metadata:
+      labels:
+        app: resume-summary
+    spec:
+      containers:
+      - name: resume-summary
+        image: ${DOCKER_HUB_USERNAME}/resume-summary:latest
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        env:
+        - name: MODEL_PATH
+          value: "/app/models"
+        volumeMounts:
+        - name: model-storage
+          mountPath: /app/models
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: model-storage-pvc
