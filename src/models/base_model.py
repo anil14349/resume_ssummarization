@@ -1,4 +1,3 @@
-# models/base_model.py
 """Base class for all resume models."""
 import re
 from abc import ABC, abstractmethod
@@ -60,29 +59,32 @@ class BaseResumeModel(ABC):
         return template_data
 
     def clean_output(self, text):
-        """Clean up the generated text."""
-        # Remove cleanup words
-        for word in self.config['formatting']['cleanup_words']:
-            text = text.replace(word, "")
+        """Clean the model output."""
+        # Basic text cleaning
+        text = text.strip()
+        text = text.replace('  ', ' ')
+        text = text.replace(' ,', ',')
+        text = text.replace(' .', '.')
+        text = text.replace('..', '.')
         
-        # Remove trailing punctuation
-        text = re.sub(r'[.,;:!?]+$', '', text.strip())
-        
-        # Remove trailing "in" if present
-        text = re.sub(r'\s+in\s*$', '', text)
-        
-        # Add period at the end if not present
+        # Fix capitalization
+        if text and not text[0].isupper():
+            text = text[0].upper() + text[1:]
+
+        # Add period at end if missing
         if not text.endswith('.'):
             text += '.'
-        
+
         return text.strip()
 
     @abstractmethod
-    def generate_prompt(self, formatted_data):
-        """Generate prompt from formatted data."""
-        pass
-
-    @abstractmethod
     def generate_summary(self, input_json):
-        """Generate summary from input JSON."""
+        """Generate a summary from the input data.
+        
+        Args:
+            input_json: Dictionary containing resume data
+            
+        Returns:
+            str: Generated summary text
+        """
         pass
