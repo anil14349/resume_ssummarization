@@ -19,26 +19,24 @@ class BartResumeModel(BaseResumeModel):
         # Initialize tokenizer and model with caching
         self.tokenizer = BartTokenizer.from_pretrained(
             self.config['model']['name'],
-            model_max_length=1024,
             force_download=False,
-            legacy=False,
-            padding_side='left',
             cache_dir=self.cache_dir,
-            local_files_only=False  # Allow downloading if not in cache
+            local_files_only=False
         )
         
         self.model = BartForConditionalGeneration.from_pretrained(
             self.config['model']['name'],
             force_download=False,
             cache_dir=self.cache_dir,
-            local_files_only=False  # Allow downloading if not in cache
+            local_files_only=False
         )
     
     def generate_prompt(self, formatted_data):
         """Generate a prompt using the template strings."""
         template_data = self.format_template_data(formatted_data)
         templates = {k: v.format(**template_data) for k, v in SUMMARY_TEMPLATES.items()}
-        return BART_PROMPT.format(**templates)
+        prompt = BART_PROMPT.format(**templates)
+        return prompt.replace('\n', ' ').strip()
     
     def generate_summary(self, input_json):
         """Generate a professional summary using BART model."""
@@ -50,23 +48,36 @@ class BartResumeModel(BaseResumeModel):
             input_text = self.generate_prompt(formatted_data)
             
             # Tokenize input
-            inputs = self.tokenizer.encode(
-                input_text, 
-                return_tensors="pt", 
-                max_length=1024,
+            inputs = self.tokenizer(
+                input_text,
+                return_tensors="pt",
+                max_length=512,
                 truncation=True,
-                padding='max_length'
+                padding=True
             )
             
             # Generate summary
             with torch.no_grad():
                 outputs = self.model.generate(
-                    inputs,
-                    **self.config['model']['generation_params']
+                    inputs.input_ids,
+                    attention_mask=inputs.attention_mask,
+                    max_length=self.config['model']['generation_params']['max_length'],
+                    min_length=self.config['model']['generation_params']['min_length'],
+                    num_beams=self.config['model']['generation_params']['num_beams'],
+                    length_penalty=self.config['model']['generation_params']['length_penalty'],
+                    no_repeat_ngram_size=self.config['model']['generation_params']['no_repeat_ngram_size'],
+                    early_stopping=self.config['model']['generation_params']['early_stopping'],
+                    repetition_penalty=self.config['model']['generation_params']['repetition_penalty'],
+                    do_sample=self.config['model']['generation_params']['do_sample']
                 )
             
             # Decode and clean up the generated text
             summary = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Remove the input prompt from the output if it appears
+            if input_text in summary:
+                summary = summary.replace(input_text, "").strip()
+            
             return self.clean_output(summary)
             
         except Exception as e:

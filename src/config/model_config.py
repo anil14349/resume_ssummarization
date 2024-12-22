@@ -7,16 +7,14 @@ BART_CONFIG = {
     'model': {
         'name': 'facebook/bart-large',
         'generation_params': {
-            'max_new_tokens': 200,     # Increased for complete sentences
-            'min_length': 100,         # Ensure reasonable length
-            'num_beams': 5,            # More beams for better quality
-            'length_penalty': 1.0,     # Balanced length penalty
-            'early_stopping': True,
-            'no_repeat_ngram_size': 3,
-            'do_sample': True,         # Enable sampling
-            'temperature': 0.7,        # Control randomness
-            'top_p': 0.9,             # Nucleus sampling
-            'repetition_penalty': 1.2  # Reduce repetition
+            'max_length': 150,          # Shorter length for more focused output
+            'min_length': 75,           # Reasonable minimum length
+            'num_beams': 4,             # Standard beam search
+            'length_penalty': 1.0,      # Neutral length penalty
+            'early_stopping': True,     # Stop when all beams are finished
+            'no_repeat_ngram_size': 4,  # Prevent 4-gram repetitions
+            'do_sample': False,         # Deterministic generation
+            'repetition_penalty': 1.8   # Stronger repetition penalty
         }
     }
 }
