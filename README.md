@@ -4,7 +4,7 @@ A modern AI-powered application that generates professional summaries from resum
 
 ## Features
 
-- 📄 Multiple resume template options
+- 📄 Multiple resume template options (DOCX format)
 - 🤖 Support for different AI models (T5, GPT-2, BART)
 - 🎨 Modern dark-themed UI
 - 📊 Detailed resume parsing and analysis
@@ -55,7 +55,7 @@ graph TB
 ### Summary Generation Process
 
 1. **Input Processing**
-   - User uploads a resume based on provided templates
+   - User uploads a DOCX resume based on provided templates
    - Resume parser extracts structured information:
      - Personal details
      - Work experience
@@ -94,19 +94,28 @@ tv3/
 ├── src/
 │   ├── app.py                    # Main Streamlit application
 │   ├── models/                   # Model implementations
+│   │   ├── __init__.py
 │   │   ├── base_model.py        # Base model class
 │   │   ├── t5_model.py          # T5 model implementation
 │   │   ├── gpt2_model.py        # GPT-2 model implementation
 │   │   ├── bart_model.py        # BART model implementation
 │   │   └── model_factory.py     # Model factory class
 │   ├── parsers/                 # Resume parsers
+│   │   ├── __init__.py
 │   │   ├── ats_parser.py        # ATS format parser
 │   │   └── industry_parser.py   # Industry format parser
+│   ├── extractor/               # Document extraction utilities
+│   │   ├── __init__.py
+│   │   ├── base_resume_parser.py # Base parser interface
+│   │   └── docx_extractor.py    # DOCX file parser
 │   ├── config/                  # Configuration files
+│   │   ├── __init__.py
 │   │   ├── model_config.py      # Model parameters
 │   │   ├── app_config.py        # Application settings
 │   │   └── model_prompts.py     # Model prompts
 │   └── templates/               # Resume templates
+│       ├── ATS classic HR resume.docx
+│       └── Industry manager resume.docx
 ├── requirements.txt             # Project dependencies
 └── README.md                   # Project documentation
 ```
@@ -171,7 +180,7 @@ streamlit run src/app.py
 2. Access the application in your web browser (typically http://localhost:8501)
 
 3. Follow the steps in the application:
-   - Choose a resume template
+   - Choose a resume template (DOCX format)
    - Download and fill out the template
    - Upload your completed resume
    - Select an AI model
