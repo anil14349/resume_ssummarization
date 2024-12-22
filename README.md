@@ -1,70 +1,31 @@
 # Resume Summary Generator with ML-Enhanced Cleanup
 
-A sophisticated resume summary generation system that uses transformer models with RAG (Retrieval-Augmented Generation), few-shot learning, and ML-based cleanup for high-quality outputs.
+A sophisticated resume summary generation system that uses transformer models with few-shot learning and chain-of-thought reasoning for high-quality outputs.
 
 ## Features
 
 ### Core Functionality
-- **Multiple Model Support**: GPT-2, T5, and BART models
+- **Multiple Model Support**: GPT-2 implementation (T5 and BART planned)
 - **Enhanced Generation**:
-  - RAG (Retrieval-Augmented Generation)
   - Few-shot learning
   - Chain-of-thought reasoning
-- **ML-Based Cleanup**:
-  - Quality scoring with DeBERTa
-  - Style matching with Sentence Transformers
-  - Seq2seq refinement with T5
 
-### Advanced Training Features
-- **Hyperparameter Tuning**:
-  - Optuna-based optimization
-  - Cross-validation
-  - Pruning for efficiency
-  - Learning rate warmup
-
-- **Model Training**:
-  - Early stopping
-  - Model checkpointing
-  - Comprehensive logging
-  - Multiple evaluation metrics
-
-- **Visualization Tools**:
-  - Interactive training plots
-  - Learning curves with confidence intervals
-  - Metric relationship analysis
-  - 2D embeddings (t-SNE/PCA)
-  - Radar charts
-  - PDF reports
-
-## Project Structure
+### Project Structure
 ```
 tv3/
 ├── src/
 │   ├── models/
 │   │   ├── gpt2_model.py      # GPT-2 model implementation
-│   │   ├── t5_model.py        # T5 model implementation
-│   │   ├── bart_model.py      # BART model implementation
-│   │   ├── ml_cleanup.py      # ML-based cleanup system
 │   │   └── enhanced_model_factory.py  # Model factory with enhancements
 │   ├── parsers/
 │   │   └── parser_factory.py  # Resume parser implementations
-│   ├── training/
-│   │   ├── prepare_cleanup_data.py    # Data preparation
-│   │   ├── train_cleanup.py           # Training pipeline
-│   │   ├── hyperparameter_tuning.py   # Hyperparameter optimization
-│   │   └── visualization.py           # Training visualization
 │   ├── config/
 │   │   └── model_prompts.py   # Model prompts and configurations
 │   └── generate_summary.py     # Main generation script
 ├── data/
-│   └── cleanup/               # Training data
 ├── logs/
-│   ├── cleanup/              # Training logs
-│   └── hyperparameter_tuning/ # Optimization logs
-├── checkpoints/              # Model checkpoints
 ├── models/                   # Trained models
-├── exported_models/          # Deployment-ready models
-└── visualizations/          # Training visualizations
+└── exported_models/          # Deployment-ready models
 ```
 
 ## Installation
@@ -90,46 +51,6 @@ from src.generate_summary import generate_summary
 summary = generate_summary("path/to/resume.pdf")
 ```
 
-### Training the Cleanup Model
-
-1. Prepare training data:
-```python
-python src/training/prepare_cleanup_data.py
-```
-
-2. Run hyperparameter optimization:
-```python
-python src/training/hyperparameter_tuning.py
-```
-
-3. Train model with best parameters:
-```python
-python src/training/train_cleanup.py
-```
-
-4. View training results:
-```python
-from training.visualization import MetricsVisualizer
-
-visualizer = MetricsVisualizer("logs/cleanup/metrics_latest.csv")
-visualizer.generate_report("training_report.pdf")
-```
-
-### Using the ML Cleanup
-
-```python
-from models.ml_cleanup import MLCleanupEnhancer
-
-# Initialize
-cleanup = MLCleanupEnhancer()
-
-# Clean text
-cleaned_text = cleanup.clean_output(
-    raw_text,
-    style_example="Optional style example"
-)
-```
-
 ## Model Training Pipeline
 
 1. **Data Preparation**:
@@ -137,20 +58,13 @@ cleaned_text = cleanup.clean_output(
    - Create training pairs
    - Split into train/validation sets
 
-2. **Hyperparameter Optimization**:
-   - Learning rate
-   - Batch size
-   - Model architecture
-   - Training duration
-   - Early stopping parameters
-
-3. **Model Training**:
+2. **Model Training**:
    - Cross-validation
    - Early stopping
    - Checkpointing
    - Multiple metrics tracking
 
-4. **Evaluation**:
+3. **Evaluation**:
    - BLEU score
    - METEOR score
    - ROUGE scores
@@ -2375,7 +2289,7 @@ async def get_api_version(
 
 @app.post("/generate")
 async def generate(
-    request: GenerateRequest,
+    request: Request,
     version: str = Depends(get_api_version)
 ):
     if version == "1.0":
@@ -2894,4 +2808,3 @@ class RedisManager:
     ) -> Optional[dict]:
         data = self.redis.get(key)
         return json.loads(data) if data else None
-```
