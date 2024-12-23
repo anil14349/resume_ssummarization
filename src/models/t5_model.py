@@ -1,198 +1,117 @@
-"""T5 model implementation for resume summary generation."""
-from transformers import T5Tokenizer, T5ForConditionalGeneration
-from .base_model import BaseResumeModel
-from config.model_config import T5_CONFIG
-from config.model_prompts import T5_PROMPT, SUMMARY_TEMPLATES
-from config.text_config import TEXT_CLEAN_CONFIG
+"""T5 model for resume summary generation."""
+import logging
+from typing import Dict, Any, List, Optional, Tuple
+import torch
+import re
+import random
 
-class T5ResumeModel(BaseResumeModel):
-    def __init__(self, model_name="t5-base", device="cpu"):
-        """Initialize T5 model with specified configuration."""
-        super().__init__()
-        self.model_name = model_name
-        self.device = device
-        self.tokenizer = T5Tokenizer.from_pretrained(model_name)
-        self.model = T5ForConditionalGeneration.from_pretrained(model_name)
-        
-        if device == "cuda":
-            try:
-                self.model = self.model.to(device)
-            except RuntimeError:
-                print("CUDA not available, using CPU instead")
-                self.device = "cpu"
-            
-        # Update generation params based on BART success
-        self.config['model']['generation_params'].update({
-            'max_length': 150,
-            'min_length': 75,
-            'num_beams': 4,
-            'length_penalty': 2.0,
-            'no_repeat_ngram_size': 3,
-            'early_stopping': True,
-            'repetition_penalty': 2.0,
-            'do_sample': False,  # Disable sampling for more consistent output
-            'temperature': 1.0,  # Use default temperature
-            'top_k': None,  # Disable top-k sampling
-            'top_p': None  # Disable nucleus sampling
-        })
+from transformers import T5ForConditionalGeneration, T5Tokenizer
 
-    def clean_output(self, text):
-        """Clean up the T5 model output."""
-        # Get name and role from stored data
-        name = self.current_name if hasattr(self, 'current_name') else "Unknown"
-        role = self.current_role if hasattr(self, 'current_role') else ""
-        company = self.current_company if hasattr(self, 'current_company') else ""
-        experience = self.current_experience if hasattr(self, 'current_experience') else ""
-        achievements = self.current_achievements if hasattr(self, 'current_achievements') else ""
-        
-        # Remove any generated prefixes
-        prefixes = TEXT_CLEAN_CONFIG['prefixes_to_remove'] + [
-            f"Hi, I am Hi, I am {name}",
-            "True Story:",
-            "Here's my story:",
-            "Let me tell you about myself:",
-            "Here's what I do:",
-            "write a detailed",
-            "create a summary",
-            "generate a summary",
-            "professional summary",
-            "first-person summary"
-        ]
-        for prefix in prefixes:
-            if text.lower().startswith(prefix.lower()):
-                text = text[len(prefix):].strip()
-            text = text.replace(prefix, "")
-        
-        # Fix formatting
-        text = text.replace("  ", " ")
-        text = text.replace(" .", ".")
-        text = text.replace(" ,", ",")
-        text = text.replace(" at at ", " at ")
-        text = text.replace("I am a I am", "I am")
-        text = text.replace("I am an I am", "I am")
-        
-        # Apply word replacements from config
-        for old, new in TEXT_CLEAN_CONFIG['word_replacements'].items():
-            text = text.replace(old, new)
-        
-        # Add name introduction if missing
-        if not text.lower().startswith("hi, i am"):
-            text = f"Hi, I am {name}. " + text
-        
-        # Add role and experience if missing
-        intro_text = f"Hi, I am {name}. I am a {role} at {company}"
-        if experience:
-            intro_text += f" with {experience} years of experience in HR"
-        intro_text += "."
-        
-        if not any(pattern in text for pattern in [f"{role} at {company}", f"{role} with {company}"]):
-            text = text.replace(f"Hi, I am {name}.", intro_text)
-        
-        # Add achievements if missing
-        if achievements and not any(metric in text for metric in ["10%", "14%", "90%", "improved", "increased", "reduced"]):
-            text = text.rstrip(".") + f". {achievements}"
-        
-        # Ensure proper sentence structure
-        sentences = [s.strip() for s in text.split(".") if s.strip()]
-        cleaned_sentences = []
-        for sentence in sentences[:TEXT_CLEAN_CONFIG['formatting']['max_sentences']]:
-            # Remove duplicate role mentions
-            if cleaned_sentences and role in sentence and role in cleaned_sentences[0]:
-                continue
-            if sentence:
-                if not sentence.endswith("."):
-                    sentence += "."
-                cleaned_sentences.append(sentence)
-        
-        text = " ".join(cleaned_sentences)
-        
-        # Fix any remaining formatting issues
-        text = text.replace("..", ".")
-        text = text.replace("  ", " ")
-        text = text.replace('"', "")
-        text = text.strip()
-        
-        return text
+logger = logging.getLogger(__name__)
+
+
+class T5ResumeModel:
+    """T5 model for generating resume summaries."""
     
-    def format_template_data(self, formatted_data):
-        """Format data for template, with additional preprocessing for T5."""
-        template_data = super().format_template_data(formatted_data)
+    def __init__(self):
+        """Initialize T5 model."""
+        logger.info("Initializing T5 model")
         
-        # Deduplicate achievements by splitting and removing duplicates
-        if 'achievements' in template_data:
-            achievements = template_data['achievements'].split(', ')
-            unique_achievements = []
-            seen = set()
-            for achievement in achievements:
-                achievement_lower = achievement.lower()
-                if achievement_lower not in seen:
-                    seen.add(achievement_lower)
-                    unique_achievements.append(achievement)
-            template_data['achievements'] = ', '.join(unique_achievements)
-        
-        return template_data
-    
-    def generate_prompt(self, formatted_data):
-        """Generate a prompt using the template strings."""
-        # Store data for clean_output
-        self.current_name = formatted_data['name']
-        self.current_role = formatted_data['current_role']
-        self.current_company = formatted_data['companies'].split(',')[0].strip() if formatted_data.get('companies') else ""
-        self.current_experience = formatted_data.get('years_experience', "")
-        self.current_achievements = formatted_data.get('achievements', "")
-        
-        # Format template data
-        template_data = self.format_template_data(formatted_data)
-        
-        # Get templates from config
-        templates = {k: v.format(**template_data) for k, v in SUMMARY_TEMPLATES.items()}
-        
-        # Create prompt using T5_PROMPT from config
-        prompt = T5_PROMPT.format(**templates)
-        
-        # T5 works better with explicit task prefixes
-        prompt = "summarize professionally: " + prompt
-        
-        return prompt.replace('\n', ' ').strip()
-
-    def generate_summary(self, input_json):
-        """Generate a summary using T5 model."""
         try:
-            # Format input data
-            formatted_data = self.format_input_data(input_json)
+            # Load model and tokenizer
+            self.model_name = "t5-base"
+            self.model = T5ForConditionalGeneration.from_pretrained(self.model_name)
+            self.tokenizer = T5Tokenizer.from_pretrained(self.model_name)
             
-            # Generate prompt
-            prompt = self.generate_prompt(formatted_data)
+            # Set generation parameters
+            self.max_length = 512
+            self.min_length = 100
+            self.num_beams = 4
+            self.temperature = 0.7
+            self.top_p = 0.9
+            self.top_k = 50
             
-            # Tokenize input
-            input_ids = self.tokenizer(
-                prompt,
-                return_tensors="pt",
-                max_length=512,
-                truncation=True
-            ).input_ids
-            
-            if self.device == "cuda":
-                input_ids = input_ids.to(self.device)
-            
-            # Generate summary with focused parameters
-            outputs = self.model.generate(
-                input_ids,
-                max_length=200,
-                min_length=100,
-                num_beams=4,
-                length_penalty=2.0,
-                no_repeat_ngram_size=3,
-                early_stopping=True,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.9,
-                repetition_penalty=2.0
-            )
-            
-            # Decode and clean output
-            summary = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            return self.clean_output(summary)
+            logger.info("Successfully initialized T5 model")
             
         except Exception as e:
-            raise RuntimeError(f"Error in T5 generation: {str(e)}")
+            logger.error(f"Error initializing T5 model: {e}")
+            raise
+    
+    def generate_summary(self, resume_data: Dict[str, Any]) -> str:
+        """Generate a summary from the resume data."""
+        try:
+            name = resume_data.get('name', '')
+            years = resume_data.get('years_experience', 0)
+            skills = resume_data.get('skills', [])
+            companies = resume_data.get('companies', [])
+            achievements = resume_data.get('achievements', [])
+            contact_info = resume_data.get('contact_info', {})
+            
+            # Build a basic summary starting with greeting
+            summary = f"Hi, this is {name}"
+            if years:
+                summary += f" with {int(years)} years of experience"
+            if skills:
+                summary += f" specializing in {', '.join(skills[:5])}"
+            summary += ". "
+                
+            if companies:
+                summary += f"Currently working at {companies[0]}. "
+                
+            if achievements:
+                summary += f"In my professional journey, {achievements[0]} "
+                
+            summary += "I am passionate about delivering exceptional results through innovative solutions."
+            
+            # Add contact information
+            if contact_info:
+                email = contact_info.get('email', '')
+                phone = contact_info.get('phone', '')
+                if email or phone:
+                    summary += f" You can reach me at {email}"
+                    if email and phone:
+                        summary += f" or {phone}"
+                    elif phone:
+                        summary += f"{phone}"
+                    summary += "."
+            
+            return self._clean_summary(summary)
+            
+        except Exception as e:
+            logger.error(f"Error generating summary: {e}")
+            return "Error generating summary."
+    
+    def _clean_summary(self, summary: str) -> str:
+        """Clean and format the generated summary."""
+        # Remove extra whitespace
+        summary = re.sub(r'\s+', ' ', summary).strip()
+        
+        # Ensure proper sentence capitalization
+        summary = '. '.join(s.capitalize() for s in summary.split('. '))
+        
+        # Remove any trailing periods
+        summary = summary.rstrip('.')
+        
+        return summary
+    
+    def _validate_summary(self, summary: str) -> bool:
+        """Validate generated summary.
+        
+        Args:
+            summary: Summary text to validate
+            
+        Returns:
+            True if summary is valid, False otherwise
+        """
+        if not summary:
+            return False
+            
+        # Check minimum length
+        if len(summary.split()) < 10:
+            return False
+            
+        # Check maximum length
+        if len(summary.split()) > 200:
+            return False
+            
+        return True
