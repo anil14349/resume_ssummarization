@@ -18,20 +18,20 @@ UI_CONFIG = {
         }
     },
     'models': {
-        'T5 Model (Fast & Efficient)': {
+        'GPT-2 (Professional)': {
+            'type': 'gpt2',
+            'size': 'base',
+            'description': 'Generates concise, professional summaries with a focus on achievements and skills'
+        },
+        'T5 (Balanced)': {
             'type': 't5',
             'size': 'base',
-            'description': 'Best for quick, concise summaries that focus on key points'
+            'description': 'Creates well-rounded summaries that balance experience and accomplishments'
         },
-        'GPT-2 Model (Creative)': {
-            'type': 'gpt2',
-            'size': 'medium',
-            'description': 'Good for natural-sounding summaries with a professional tone'
-        },
-        'BART Model (Detailed)': {
+        'BART (Detailed)': {
             'type': 'bart',
-            'size': 'large',
-            'description': 'Ideal for comprehensive summaries with balanced detail and clarity'
+            'size': 'base',
+            'description': 'Produces detailed summaries with comprehensive coverage of skills and experience'
         }
     }
 }

@@ -198,8 +198,13 @@ class ATSParser(BaseParser):
         'website', 'social media', 'github'
     }
     
-    def __init__(self):
-        """Initialize ATS parser."""
+    def __init__(self, file_path: str):
+        """Initialize ATS parser.
+        
+        Args:
+            file_path: Path to the resume file to parse
+        """
+        self.file_path = file_path
         super().__init__()
 
     def clean_text(self, text):
@@ -1060,7 +1065,6 @@ class ATSParser(BaseParser):
 # Example usage
 if __name__ == "__main__":
     file_path = 'src/templates/ATS classic HR resume.docx'
-    parser = ATSParser()
-    parser.file_path = file_path
+    parser = ATSParser(file_path)
     parsed_data = parser.parse_docx_to_json()
     print(json.dumps(parsed_data, indent=4))

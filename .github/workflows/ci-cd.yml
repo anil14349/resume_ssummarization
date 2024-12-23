@@ -34,6 +34,7 @@ jobs:
         
     - name: Run tests with pytest
       run: |
+        # Run all tests including model summary generation and contact information handling
         pytest tests/ --cov=src --cov-report=xml
         
     - name: Upload coverage to Codecov
