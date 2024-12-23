@@ -1,124 +1,171 @@
-# Resume Summary Generator with ML-Enhanced Cleanup
+# Resume Summary Generator
 
-A sophisticated resume summary generation system that uses transformer models with few-shot learning and chain-of-thought reasoning for high-quality outputs.
+A powerful application that generates professional summaries from resumes using advanced language models.
 
-## Architecture
-
+## Architecture Diagram
 ```mermaid
 graph TD
-    Client[Client Application] --> API[API Layer]
-    API --> ModelFactory[Enhanced Model Factory]
-    
-    ModelFactory --> GPT2[GPT-2 Model]
-    ModelFactory --> T5[T5 Model]
-    ModelFactory --> BART[BART Model]
-    
-    subgraph Input Processing
-        API --> Parser[Resume Parser]
-        Parser --> TextCleaner[Text Cleaner]
-        TextCleaner --> Tokenizer[Tokenizer]
+    subgraph Frontend
+        UI[Streamlit UI] --> |Upload DOCX| API
+        UI --> |Display| Sum[Summary]
     end
     
-    subgraph Model Enhancement
-        ModelFactory --> FewShot[Few-Shot Learning]
-        ModelFactory --> CoT[Chain of Thought]
-        FewShot --> Generator[Generator]
-        CoT --> Generator
+    subgraph Backend
+        API[FastAPI Server] --> |Process| PF[Parser Factory]
+        API --> |Generate| MF[Model Factory]
+        
+        PF --> |Parse| P1[ATS Parser]
+        PF --> |Parse| P2[Industry Parser]
+        
+        MF --> |Generate| M1[GPT-2 Model]
+        MF --> |Generate| M2[T5 Model]
+        MF --> |Generate| M3[BART Model]
+        
+        P1 & P2 --> |Extracted Data| MF
+        M1 & M2 & M3 --> |Generated Summary| API
     end
     
-    subgraph Output Processing
-        Generator --> Evaluator[Output Evaluator]
-        Evaluator --> Metrics[Metrics Calculator]
-        Evaluator --> Summary[Final Summary]
-    end
+    API --> |Return| Sum
 ```
 
-For detailed documentation of all components, please refer to the [docs](./docs) directory.
+## Flow Diagram
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant S as Streamlit UI
+    participant A as FastAPI
+    participant P as Parser
+    participant M as Model
+    
+    U->>S: Upload Resume
+    S->>A: POST /generate-summary
+    A->>P: Extract Information
+    P-->>A: Parsed Data
+    A->>M: Generate Summary
+    M-->>A: Generated Summary
+    A-->>S: Return Summary
+    S-->>U: Display Summary
+    U->>S: Edit Summary
+    U->>S: Download Summary
+```
 
 ## Features
 
-### Core Functionality
-- **Multiple Model Support**: GPT-2 implementation (T5 and BART planned)
-- **Enhanced Generation**:
-  - Few-shot learning
-  - Chain-of-thought reasoning
+- 📄 Support for DOCX resume files
+- 🤖 Multiple AI models (GPT-2, T5, BART)
+- 🎯 Specialized parsers (ATS, Industry)
+- 🌐 RESTful API
+- 🖥️ User-friendly web interface
+- ✏️ Editable summaries
+- 💾 Download functionality
 
-### Project Structure
-```
-tv3/
-├── src/
-│   ├── models/
-│   │   ├── gpt2_model.py      # GPT-2 model implementation
-│   │   └── enhanced_model_factory.py  # Model factory with enhancements
-│   ├── parsers/
-│   │   └── parser_factory.py  # Resume parser implementations
-│   ├── config/
-│   │   └── model_prompts.py   # Model prompts and configurations
-│   └── generate_summary.py     # Main generation script
-├── data/
-├── logs/
-├── models/                   # Trained models
-└── exported_models/          # Deployment-ready models
-```
+## Quick Start
 
-## Installation
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/resume-summary.git
+   cd resume-summary
+   ```
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/tv3.git
-cd tv3
-```
+2. **Using Docker:**
+   ```bash
+   docker build -t resume-summary .
+   docker run -p 8000:8000 -p 8501:8501 resume-summary
+   ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+3. **Manual Setup:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Run the applications:**
+   ```bash
+   # Start FastAPI server
+   uvicorn src.api.main:app --reload
+
+   # Start Streamlit app
+   streamlit run src/streamlit_app.py
+   ```
 
 ## Usage
 
-### Basic Summary Generation
-```python
-from src.generate_summary import generate_summary
+1. Open the Streamlit interface at http://localhost:8501
+2. Upload a DOCX resume file
+3. Select model and parser type
+4. Click "Generate Summary"
+5. Edit the generated summary if needed
+6. Download the final summary
 
-# Generate summary from resume
-summary = generate_summary("path/to/resume.pdf")
+## API Documentation
+
+The FastAPI server provides these endpoints:
+- `POST /generate-summary/`: Generate summary from resume
+- `GET /models`: List available models
+- `GET /parsers`: List available parsers
+- `GET /health`: Health check
+
+Detailed API documentation available at http://localhost:8000/docs
+
+## Project Structure
+```
+resume-summary/
+├── src/
+│   ├── api/              # FastAPI application
+│   ├── models/           # AI models
+│   ├── parsers/          # Resume parsers
+│   ├── templates/        # Resume templates
+│   ├── utils/            # Utility functions
+│   ├── generate_summary.py
+│   └── streamlit_app.py
+├── docs/                 # Documentation
+├── tests/               # Test files
+├── Dockerfile          # Docker configuration
+├── requirements.txt    # Python dependencies
+└── README.md
 ```
 
-## Model Training Pipeline
+## Development
 
-1. **Data Preparation**:
-   - Parse resume templates
-   - Create training pairs
-   - Split into train/validation sets
+### Testing
+```bash
+pytest tests/
+```
 
-2. **Model Training**:
-   - Cross-validation
-   - Early stopping
-   - Checkpointing
-   - Multiple metrics tracking
+### Code Style
+```bash
+flake8 src/
+```
 
-3. **Evaluation**:
-   - BLEU score
-   - METEOR score
-   - ROUGE scores
-   - BERTScore
-   - Style consistency
+## Deployment
+
+The application can be deployed to various cloud platforms:
+- AWS ECS/EKS
+- Google Cloud Run
+- Azure Container Apps
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Documentation
+
+- [Architecture Documentation](docs/architecture.md)
+- [API Documentation](docs/api.md)
+
+## Authors
+
+- Your Name - Initial work
+
 ## Acknowledgments
 
-- Hugging Face Transformers library
-- Sentence Transformers
-- Optuna optimization framework
-- NLTK and spaCy for NLP tasks
+- OpenAI for GPT-2
+- Google for T5
+- Facebook for BART

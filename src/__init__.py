@@ -1,8 +1,8 @@
 """
 Source package for the professional summary generator.
 """
-from .models.model_factory import ResumeModelFactory
+from .models.model_factory import create_model
 
 __all__ = [
-    'ResumeModelFactory'
+    'create_model'
 ]

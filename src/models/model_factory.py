@@ -3,7 +3,10 @@
 import logging
 from typing import Any
 
+from models.bart_model import BartResumeModel   
 from .gpt2_model import GPT2Model
+from .t5_model import T5ResumeModel
+
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,10 @@ def create_model(model_type: str) -> Any:
         
         if model_type.lower() == 'gpt2':
             return GPT2Model()
+        elif model_type.lower() == 't5':
+            return T5ResumeModel()
+        elif model_type.lower() == 'bart':
+            return BartResumeModel()
         else:
             raise ValueError(f"Unknown model type: {model_type}")
             

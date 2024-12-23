@@ -1,5 +1,5 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+# Use Python 3.11 slim image
+FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -10,23 +10,40 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy requirements first for better caching
 COPY requirements.txt .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the project code
 COPY . .
 
 # Create non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
+RUN useradd -m appuser && \
+    chown -R appuser:appuser /app
 USER appuser
 
-# Expose port
-EXPOSE 8000
+# Add src to Python path
+ENV PYTHONPATH=/app
 
-# Command to run the application
-CMD ["python", "-m", "src.generate_summary"]
+# Create a directory for templates if it doesn't exist
+RUN mkdir -p src/templates
+
+# Expose ports for FastAPI and Streamlit
+EXPOSE 8000 8501
+
+# Create a script to run both services
+RUN echo '#!/bin/bash\n\
+cd /app && \
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000 & \n\
+cd /app && \
+streamlit run src/streamlit_app.py --server.port 8501 --server.address 0.0.0.0\n\
+wait' > /app/start.sh && chmod +x /app/start.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/app/start.sh"]

@@ -52,25 +52,37 @@ def parse_arguments():
     args = parser.parse_args()
     return args
 
-def main():
-    """Main function."""
+def main(input_file: str, model_type: str = "gpt2", parser_type: str = "ats", debug: bool = False) -> str:
+    """Main function for generating resume summaries.
+    
+    Args:
+        input_file: Path to input resume file
+        model_type: Type of model to use (gpt2, t5, or bart)
+        parser_type: Type of parser to use (ats or industry)
+        debug: Enable debug logging
+        
+    Returns:
+        str: Generated summary
+        
+    Raises:
+        FileNotFoundError: If input file not found
+        ValueError: If resume parsing fails
+    """
     try:
-        # Parse command line arguments
-        args = parse_arguments()
-        logger.info(f"Starting summary generation with args: {args}")
+        logger.info(f"Starting summary generation with: model={model_type}, parser={parser_type}")
         
         # Validate input file
-        if not os.path.exists(args.input_file):
-            logger.error(f"Input file not found: {args.input_file}")
-            raise FileNotFoundError(f"Input file not found: {args.input_file}")
+        if not os.path.exists(input_file):
+            logger.error(f"Input file not found: {input_file}")
+            raise FileNotFoundError(f"Input file not found: {input_file}")
             
         # Get absolute path
-        input_file = os.path.abspath(args.input_file)
+        input_file = os.path.abspath(input_file)
         logger.info(f"Processing resume file: {input_file}")
         
         # Create parser
-        parser = ParserFactory.create_parser(args.parser, input_file)
-        logger.info(f"Created parser of type '{args.parser}' for file: {input_file}")
+        parser = ParserFactory.create_parser(parser_type, input_file)
+        logger.info(f"Created parser of type '{parser_type}' for file: {input_file}")
         
         # Parse resume
         resume_data = parser.parse(input_file)
@@ -80,23 +92,43 @@ def main():
         
         # Create model
         try:
-            model = create_model(args.model)
+            model = create_model(model_type)
         except Exception as e:
             logger.error(f"Error creating model: {e}")
-            sys.exit(1)
+            raise
         
         # Generate summary
         try:
             summary = model.generate_summary(resume_data)
-            print("\nGenerated Summary:\n-----------------")
-            print(summary)
+            return summary
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
-            sys.exit(1)
+            raise
         
     except Exception as e:
         logger.error(f"Error in main: {e}")
         raise
 
 if __name__ == "__main__":
-    main()
+    # Parse command line arguments when run as script
+    args = parse_arguments()
+    
+    # Set debug logging if requested
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    try:
+        # Call main function with parsed arguments
+        summary = main(
+            input_file=args.input_file,
+            model_type=args.model,
+            parser_type=args.parser,
+            debug=args.debug
+        )
+        
+        # Print summary
+        print("\nGenerated Summary:\n-----------------")
+        print(summary)
+        
+    except Exception as e:
+        sys.exit(1)
