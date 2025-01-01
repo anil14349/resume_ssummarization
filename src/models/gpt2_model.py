@@ -3,7 +3,7 @@ from typing import Dict, Any
 import re
 import random
 import logging
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from transformers import pipeline
 from .base_model import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -17,22 +17,16 @@ class GPT2Model(BaseModel):
         logger.info("Initializing GPT-2 model")
         
         try:
-            self.model_name = "gpt2"
-            self.model = GPT2LMHeadModel.from_pretrained(self.model_name)
-            self.tokenizer = GPT2Tokenizer.from_pretrained(self.model_name)
+            # Initialize the pipeline
+            self.generator = pipeline("text-generation", model="gpt2")
             
             # Set generation parameters
-            self.max_length = 1024  # Keep longer length for comprehensive summaries
-            self.min_length = 256   # Keep minimum length for completeness
-            self.num_beams = 6      # Increased beams for better quality and consistency
-            self.length_penalty = 2.0  # Slightly reduced to not over-extend
-            self.early_stopping = True
-            self.no_repeat_ngram_size = 3
-            self.temperature = 0.6   # Reduced temperature for more focused output
-            self.top_p = 0.85       # More conservative nucleus sampling
-            self.top_k = 40         # More conservative top-k
-            self.repetition_penalty = 1.2  # Added to avoid repetition
-            self.do_sample = False  # Disabled sampling for more deterministic output
+            self.max_length = 1024     # Set to GPT-2's max context length
+            self.min_length = 256      # Minimum length for a good response
+            self.num_return_sequences = 1
+            self.temperature = 0.8     # Slightly increased for more creative scene descriptions
+            self.top_p = 0.92         # Increased for more diverse outputs
+            self.top_k = 50           # Increased for more vocabulary variety
             
         except Exception as e:
             logger.error(f"Error initializing GPT-2 model: {e}")
@@ -41,117 +35,181 @@ class GPT2Model(BaseModel):
     def generate_summary(self, resume_data: Dict[str, Any]) -> str:
         """Generate a summary from resume data."""
         try:
-            # Extract data
+            # Extract and format data
             name = self._format_name(resume_data.get('name', ''))
             years = resume_data.get('years_experience', 0)
             skills = resume_data.get('skills', [])
             companies = resume_data.get('companies', [])
             achievements = resume_data.get('achievements', [])
-            contact_info = resume_data.get('contact_info', {})
             current_role = resume_data.get('current_role', '')
             education = resume_data.get('education', [])
-            projects = resume_data.get('projects', [])
             
-            # Build professional summary
-            summary_parts = []
+            # Ensure all lists are properly formatted
+            skills_str = ', '.join(str(skill) for skill in skills[:5]) if isinstance(skills, list) else str(skills)  # Limit to top 5 skills
+            companies_str = ', '.join(str(company) for company in companies[:2]) if isinstance(companies, list) else str(companies)  # Limit to 2 companies
+            achievements_str = ', '.join(str(achievement) for achievement in achievements[:2]) if isinstance(achievements, list) else str(achievements)  # Limit to 2 achievements
             
-            # Professional introduction
-            intro = f"I'm {name}"
-            if current_role:
-                intro += f", a seasoned {current_role.lower()}"
-            summary_parts.append(intro)
+            # Format education string
+            education_list = []
+            for edu in education[:1]:  # Take only the first education entry
+                if isinstance(edu, dict):
+                    degree = edu.get('degree', '')
+                    institution = edu.get('institution', '')
+                    if degree and institution:
+                        education_list.append(f"{degree} from {institution}")
+            education_str = ', '.join(education_list)
             
-            # Experience and expertise
-            if years:
-                summary_parts.append(f"with {int(years)} years of demonstrated experience")
+            # Create a more concise prompt
+            prompt = (
+                f"Create a professional video script for {name}. Experience: {years} years. "
+                f"Skills: {skills_str}. Current company: {companies_str}. "
+                f"Key achievement: {achievements_str}. Education: {education_str}\n\n"
+                "Format:\n"
+                "1. Intro\n- Caption: Professional intro\n- Audio: Role and expertise\n- Visual: Office setting\n\n"
+                "2. Experience\n- Caption: Career highlights\n- Audio: Experience summary\n- Visual: Industry symbols\n\n"
+                "3. Skills\n- Caption: Core competencies\n- Audio: Key skills\n- Visual: Skill icons\n\n"
+                "4. Achievement\n- Caption: Success story\n- Audio: Key accomplishment\n- Visual: Success imagery\n\n"
+                "5. Future\n- Caption: Career goals\n- Audio: Aspirations\n- Visual: Growth symbols\n\n"
+                "6. Contact\n- Caption: Connect\n- Audio: Call to action\n- Visual: Contact details\n\n"
+                "Script:"
+            )
             
-            # Core skills and expertise
-            if skills:
-                core_skills = skills[:5]  # Focus on core skills
-                additional_skills = skills[5:8]  # Limit additional skills
-                summary_parts.append(f"specializing in {', '.join(core_skills)}")
-                if additional_skills:
-                    summary_parts.append(f"with proficiency in {', '.join(additional_skills)}")
-            
-            # Professional experience
-            if companies:
-                if len(companies) > 1:
-                    summary_parts.append(f"Currently contributing to {companies[0]}, previously gained valuable experience at {', '.join(companies[1:2])}")
-                else:
-                    summary_parts.append(f"Currently contributing to {companies[0]}")
-            
-            # Key achievements (focused on most significant)
-            if achievements:
-                summary_parts.append("Key professional achievements include:")
-                for achievement in achievements[:2]:  # Limited to top 2 achievements
-                    summary_parts.append(f"• {achievement}")
-            
-            # Education (if relevant)
-            if education:
-                edu_parts = []
-                for edu in education[:1]:  # Focus on highest education
-                    if isinstance(edu, dict):
-                        degree = edu.get('degree', '')
-                        institution = edu.get('institution', '')
-                        if degree and institution:
-                            edu_parts.append(f"{degree} from {institution}")
-                if edu_parts:
-                    summary_parts.append("Education: " + ", ".join(edu_parts))
-            
-            # Notable projects (if highly relevant)
-            if projects:
-                project_parts = []
-                for project in projects[:1]:  # Focus on most significant project
-                    if isinstance(project, dict):
-                        project_name = project.get('name', '')
-                        project_desc = project.get('description', '')
-                        if project_name and project_desc:
-                            project_parts.append(f"{project_name}: {project_desc}")
-                if project_parts:
-                    summary_parts.append("Significant project: " + project_parts[0])
-            
-            # Professional objective (more focused)
-            summary_parts.append("Seeking to leverage proven expertise to deliver value and drive success in challenging roles")
-            
-            # Join parts with proper punctuation and formatting
-            summary = '. '.join(part.strip() for part in summary_parts if part.strip())
-            summary = summary.replace('..','.').replace('. .','.').strip()
-            
-            # Add contact information at the end
-            if contact_info:
-                contact_parts = []
-                if contact_info.get('email'):
-                    contact_parts.append(f"Email: {contact_info['email']}")
-                if contact_info.get('phone'):
-                    contact_parts.append(f"Phone: {contact_info['phone']}")
-                if contact_info.get('linkedin'):
-                    contact_parts.append(f"LinkedIn: {contact_info['linkedin']}")
+            try:
+                # Generate text using the pipeline with error handling
+                outputs = self.generator(
+                    prompt,
+                    max_length=self.max_length,
+                    num_return_sequences=self.num_return_sequences,
+                    temperature=self.temperature,
+                    top_p=self.top_p,
+                    top_k=self.top_k,
+                    pad_token_id=50256  # GPT-2's EOS token ID
+                )
                 
-                if contact_parts:
-                    summary += f"\n\nContact Information: {', '.join(contact_parts)}"
-            
-            # Clean and return the summary
-            return self._clean_summary(summary)
+                if not outputs or not isinstance(outputs, list):
+                    logger.error("No output generated from the model")
+                    return self._generate_template_summary(resume_data)
+                
+                output = outputs[0]
+                if not isinstance(output, dict) or 'generated_text' not in output:
+                    logger.error("Unexpected output format from the model")
+                    return self._generate_template_summary(resume_data)
+                
+                generated_text = output['generated_text']
+                
+                # Extract the generated script (remove the prompt)
+                parts = generated_text.split("Script:")
+                if len(parts) < 2:
+                    logger.error("Generated text does not contain expected format")
+                    return self._generate_template_summary(resume_data)
+                
+                script = parts[-1].strip()
+                
+                # Clean and validate the script
+                script = self._clean_summary(script)
+                if not self._validate_summary(script):
+                    logger.warning("Generated script failed validation, falling back to template")
+                    return self._generate_template_summary(resume_data)
+                    
+                return script
+                
+            except Exception as model_error:
+                logger.error(f"Error during model generation: {str(model_error)}")
+                return self._generate_template_summary(resume_data)
             
         except Exception as e:
-            logger.error(f"Error generating summary: {e}")
-            return "Error generating summary."
+            logger.error(f"Error in generate_summary: {str(e)}")
+            return self._generate_template_summary(resume_data)
+
+    def _generate_template_summary(self, resume_data: Dict[str, Any]) -> str:
+        """Fallback method to generate summary using templates."""
+        try:
+            name = self._format_name(resume_data.get('name', 'the candidate'))
+            years = resume_data.get('years_experience', 0)
+            skills = resume_data.get('skills', [])
+            companies = resume_data.get('companies', [])
+            achievements = resume_data.get('achievements', [])
+            current_role = resume_data.get('current_role', '')
+            education = resume_data.get('education', [])
+            contact = resume_data.get('contact_info', {})
+            
+            # Format lists
+            skills_str = ', '.join(str(skill) for skill in skills[:5]) if skills else "various professional skills"
+            companies_str = ', '.join(str(company) for company in companies[:2]) if companies else "various companies"
+            achievements_str = achievements[0] if achievements else "demonstrated success in professional endeavors"
+            
+            # Format education
+            education_str = ""
+            if education and isinstance(education, list) and len(education) > 0:
+                edu = education[0]
+                if isinstance(edu, dict):
+                    degree = edu.get('degree', '')
+                    institution = edu.get('institution', '')
+                    if degree and institution:
+                        education_str = f"{degree} from {institution}"
+            
+            # Create structured video script
+            script = (
+                "1. Introduction\n"
+                f"- Caption: Meet {name}, A Professional Journey\n"
+                f"- Audio: Welcome to my professional story. I'm {name}, with {years} years of experience in {companies_str}.\n"
+                "- Visual: Professional headshot in a modern office setting\n\n"
+                
+                "2. Experience Overview\n"
+                "- Caption: Professional Excellence\n"
+                f"- Audio: Throughout my {years}-year career, I've developed expertise in {skills_str}.\n"
+                "- Visual: Dynamic montage of professional environments\n\n"
+                
+                "3. Key Skills\n"
+                "- Caption: Core Competencies\n"
+                f"- Audio: My key strengths include {skills_str}.\n"
+                "- Visual: Animated icons representing each skill\n\n"
+                
+                "4. Major Achievement\n"
+                "- Caption: Success Story\n"
+                f"- Audio: One of my proudest achievements is that I {achievements_str}.\n"
+                "- Visual: Graphs and charts showing success metrics\n\n"
+                
+                "5. Professional Goals\n"
+                "- Caption: Looking Forward\n"
+                f"- Audio: With my background in {skills_str[:2]}, I'm excited to take on new challenges.\n"
+                "- Visual: Forward-looking imagery of innovation and growth\n\n"
+                
+                "6. Connect\n"
+                "- Caption: Let's Connect\n"
+                f"- Audio: I'm always open to new opportunities and professional connections. You can reach me at {contact.get('email', '')}.\n"
+                "- Visual: Professional contact information display\n"
+            )
+            
+            return script
+            
+        except Exception as e:
+            logger.error(f"Error generating template summary: {str(e)}")
+            return f"Professional video script for {name}"
 
     def _format_name(self, name: str) -> str:
         """Format name with proper capitalization."""
         return ' '.join(word.capitalize() for word in name.split())
 
     def _validate_summary(self, summary: str) -> bool:
-        """Validate the generated summary."""
-        # Check if summary is empty
+        """Validate that the summary meets our requirements."""
         if not summary:
             return False
             
-        # Check length constraints
-        words = summary.split()
-        if len(words) < 10:  # Too short
+        # Check minimum length
+        if len(summary) < 100:  # Require at least 100 characters
             return False
-        if len(words) > 200:  # Too long
+            
+        # Check for required sections
+        required_sections = ["1.", "2.", "3.", "4.", "5.", "6."]
+        section_count = sum(1 for section in required_sections if section in summary)
+        if section_count < 4:  # Allow some flexibility but require most sections
+            return False
+            
+        # Check for required components
+        required_components = ["Caption:", "Audio:", "Visual:"]
+        component_count = sum(1 for component in required_components if component in summary)
+        if component_count < 6:  # Require at least 2 complete sections
             return False
             
         return True
@@ -159,62 +217,23 @@ class GPT2Model(BaseModel):
     def _clean_summary(self, summary: str) -> str:
         """Clean and format the generated summary."""
         try:
-            # Basic cleanup
             summary = summary.strip()
             if not summary:
                 return summary
             
-            # Clean up formatting artifacts
-            summary = re.sub(r'\s+•\s+', ' ', summary)  # Remove bullets
-            summary = re.sub(r'\[(?:skills and expertise|achievements and impact|current role and company|[^\]]+)\]', '', summary)  # Remove section headers
+            # Remove any remaining prompt text
+            summary = re.sub(r'.*?Professional Summary:', '', summary, flags=re.DOTALL)
             
-            # Clean up self-references
-            summary = re.sub(r'(?i)\b(?:my name is|i am called|this is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b', r'\1', summary)
-            summary = re.sub(r'(?i)\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:speaking|here)\b', r'\1', summary)
+            # Basic cleanup
+            summary = re.sub(r'\s+', ' ', summary)  # Remove extra whitespace
+            summary = re.sub(r'([.,!?])(\S)', r'\1 \2', summary)  # Fix spacing after punctuation
+            summary = re.sub(r'\s+([.,!?])', r'\1', summary)  # Fix spacing before punctuation
             
-            # Improve transitions
-            summary = re.sub(r'(?i)\b(?:recently|in my current role|presently)\b', 
-                           lambda m: random.choice(['In my current position', 'As part of my role', 'In my professional journey']), 
-                           summary)
-            
-            # Fix spacing around punctuation
-            summary = re.sub(r'\s+([.,!?])', r'\1', summary)
-            summary = re.sub(r'([.,!?])(\S)', r'\1 \2', summary)
-            summary = re.sub(r'\s{2,}', ' ', summary)
-            
-            # Fix email addresses (remove spaces in domain)
-            summary = re.sub(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+)\s*\.\s*([a-zA-Z]{2,})', r'\1.\2', summary)
-            
-            # Capitalize first letter and after periods
-            summary = summary[0].upper() + summary[1:]
-            summary = re.sub(r'([.!?]\s+)([a-z])', lambda m: m.group(1) + m.group(2).upper(), summary)
-            
-            # Remove trailing punctuation (except for email addresses)
-            if not re.search(r'@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', summary):
-                summary = re.sub(r'[.,!?]+$', '', summary)
+            # Capitalize first letter
+            summary = summary[0].upper() + summary[1:] if summary else summary
             
             return summary.strip()
             
         except Exception as e:
             logger.error(f"Error cleaning summary: {e}")
             return summary
-
-    def _clean_metrics(self, text: str) -> str:
-        """Clean and format metrics in text."""
-        # Format percentages
-        text = re.sub(r'\*(\d+(?:\.\d+)?)\*\s*%', r'\1%', text)
-        text = re.sub(r'\*(\d+(?:\.\d+)?%)\*', r'\1', text)
-        
-        # Format currency
-        text = re.sub(r'\*\$(\d+(?:\.\d+)?[KMB]?)\*', r'$\1', text)
-        text = re.sub(r'\*(\d+(?:\.\d+)?)\*\s*(?=million|billion|thousand)', r'\1', text)
-        
-        # Format numbers with units
-        text = re.sub(r'\*(\d+(?:\.\d+)?)\*\s+(times|x)', r'\1 \2', text)
-        text = re.sub(r'\*(\d+(?:\.\d+)?x)\*', r'\1x', text)
-        
-        # Format ranges
-        text = re.sub(r'\*(\d+)\*\s*-\s*\*(\d+)\*', r'\1-\2', text)
-        text = re.sub(r'\*(\d+)\*\s*to\s*\*(\d+)\*', r'\1 to \2', text)
-        
-        return text

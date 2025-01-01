@@ -199,13 +199,47 @@ class ATSParser(BaseParser):
     }
     
     def __init__(self, file_path: str):
-        """Initialize ATS parser.
+        """Initialize the parser with a file path."""
+        super().__init__(file_path)
+        self.resume_data = {
+            'name': '',
+            'current_role': '',
+            'companies': [],
+            'years_experience': 0,
+            'skills': [],
+            'achievements': [],
+            'education': [],
+            'contact_info': {}
+        }
+    
+    def parse(self) -> Dict[str, Any]:
+        """Parse the resume file and extract structured information.
         
-        Args:
-            file_path: Path to the resume file to parse
+        Returns:
+            Dictionary containing parsed resume data
         """
-        self.file_path = file_path
-        super().__init__()
+        try:
+            # Read the Word document
+            doc = Document(self.file_path)
+            
+            # Extract text from paragraphs
+            text_content = []
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():
+                    text_content.append(paragraph.text.strip())
+            
+            # Process the content
+            self._process_content(text_content)
+            
+            # Log the extracted data
+            for key, value in self.resume_data.items():
+                logger.info(f"{key.title()}: {value}")
+            
+            return self.resume_data
+            
+        except Exception as e:
+            logger.error(f"Error parsing file {self.file_path}: {str(e)}")
+            raise
 
     def clean_text(self, text):
         """Clean and normalize text."""
@@ -854,189 +888,6 @@ class ATSParser(BaseParser):
                 break
         
         return contact_info
-
-    def parse(self, file_path: str) -> Dict[str, Any]:
-        """Parse a .docx file to extract structured data.
-        
-        Args:
-            file_path: Path to .docx file
-            
-        Returns:
-            Dictionary with parsed data
-        """
-        try:
-            doc = Document(file_path)
-            text = self._extract_text(doc)
-            
-            # Extract contact information first
-            contact_info = self._extract_contact_info(text)
-            
-            # Extract achievements and get just the text
-            achievements = self._extract_achievements(text)
-            achievement_texts = [ach['text'] for ach in achievements]
-            
-            # Extract other information
-            data = {
-                'name': self._extract_name(text),
-                'current_role': self._extract_role(text),
-                'companies': self._extract_companies(text),
-                'years_experience': self._extract_years_experience(text),
-                'skills': self._extract_skills(text),
-                'achievements': achievement_texts,  # Just the achievement texts
-                'contact_info': contact_info  # Add contact info to parsed data
-            }
-            
-            logger.info("Parsing complete. Final data:")
-            logger.info(f"Name: {data['name']}")
-            logger.info(f"Current_Role: {data['current_role']}")
-            logger.info(f"Companies: {data['companies']}")
-            logger.info(f"Years_Experience: {data['years_experience']}")
-            logger.info(f"Skills: {data['skills']}")
-            logger.info(f"Achievements: {data['achievements']}")
-            logger.info(f"Contact Info: {data['contact_info']}")
-            
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error parsing resume: {e}")
-            raise
-
-    def parse_docx_to_json(self):
-        """Parse a .docx file to extract structured data into the specified JSON format."""
-        
-        extracted_data = {
-            'name': '',
-            'current_role': '',
-            'years_experience': 0,
-            'companies': [],
-            'achievements': [],
-            'skills': [],
-            'education': [],
-            'recognition': '',
-            'contact_info': {
-                'email': '',
-                'phone': ''
-            }
-        }
-
-        document = Document(self.file_path)
-        
-        # First pass: Extract name and role
-        paragraphs = [self.clean_text(para.text) for para in document.paragraphs if self.clean_text(para.text)]
-        
-        # Extract name
-        extracted_data['name'] = self._extract_name(paragraphs)
-        
-        work_dates = []
-        current_section = ''
-        in_experience_details = False
-        profile_text = ''
-        
-        for para in document.paragraphs:
-            text = self.clean_text(para.text)
-            if not text:
-                continue
-
-            lower_text = text.lower()
-
-            # Section detection
-            if any(section in lower_text for section in ['experience', 'employment', 'work history']) and len(text) < 30:
-                current_section = 'experience'
-                in_experience_details = False
-                continue
-            elif any(section in lower_text for section in ['achievement', 'accomplishment']) and len(text) < 30:
-                current_section = 'achievements'
-                continue
-            elif any(word in lower_text for word in ['skills', 'proficiencies', 'expertise']) and len(text) < 30:
-                current_section = 'skills'
-                continue
-            elif 'education' in lower_text and len(text) < 30:
-                current_section = 'education'
-                continue
-            elif any(section in lower_text for section in ['recognition', 'award', 'honor']) and len(text) < 30:
-                current_section = 'recognition'
-                continue
-            elif any(word in lower_text for word in ['profile', 'summary', 'objective']) and len(text) < 30:
-                current_section = 'profile'
-                continue
-
-            # Process sections
-            if current_section == 'profile':
-                profile_text += ' ' + text
-                # Extract skills from profile
-                skills = self._extract_skills(text)
-                for skill in skills:
-                    if skill not in extracted_data['skills']:
-                        extracted_data['skills'].append(skill)
-            
-            elif current_section == 'experience':
-                if '|' in text:
-                    info = self._extract_company_info(text)
-                    if info:
-                        if info['company'] and info['company'] not in extracted_data['companies']:
-                            extracted_data['companies'].append(info['company'])
-                        if info['dates']:
-                            work_dates.append((info['dates'][0], info['dates'][-1]))
-                        # Extract role from the first part
-                        parts = text.split('|')
-                        if parts and not extracted_data['current_role']:
-                            role = self.clean_text(parts[0])
-                            extracted_data['current_role'] = role
-                    in_experience_details = True
-                elif in_experience_details:
-                    achievement = self._extract_achievement(text)
-                    if achievement and achievement not in extracted_data['achievements']:
-                        extracted_data['achievements'].append(achievement)
-                        # Extract skills from achievements
-                        skills = self._extract_skills(text)
-                        for skill in skills:
-                            if skill not in extracted_data['skills']:
-                                extracted_data['skills'].append(skill)
-            
-            elif current_section == 'achievements':
-                achievement = self._extract_achievement(text)
-                if achievement and achievement not in extracted_data['achievements']:
-                    extracted_data['achievements'].append(achievement)
-                    # Extract skills from achievements
-                    skills = self._extract_skills(text)
-                    for skill in skills:
-                        if skill not in extracted_data['skills']:
-                            extracted_data['skills'].append(skill)
-            
-            elif current_section == 'education':
-                if self.is_education_related(text):
-                    if '|' in text:
-                        parts = [p.strip() for p in text.split('|')]
-                        education = next((p for p in parts if self.is_education_related(p)), None)
-                        if education and education not in extracted_data['education']:
-                            extracted_data['education'].append(education)
-                    else:
-                        education = self.clean_text(text)
-                        if education and education not in extracted_data['education']:
-                            extracted_data['education'].append(education)
-            
-            elif current_section == 'recognition':
-                if not any(word in text.lower() for word in ['section', 'recognition', 'awards']):
-                    if text not in extracted_data['recognition']:
-                        extracted_data['recognition'] = text if not extracted_data['recognition'] else extracted_data['recognition'] + '; ' + text
-
-        # Calculate total years of experience from work dates
-        if work_dates:
-            extracted_data['years_experience'] = self.calculate_years_experience(work_dates)
-
-        # Extract contact information
-        contact_info = self._extract_contact_info(profile_text)
-        extracted_data['contact_info'] = contact_info
-
-        return extracted_data
-
-    def is_education_related(self, text):
-        """Check if text is related to education."""
-        patterns = [
-            r'\b(Bachelor|Master|Doctor|PhD|Degree|Diploma|Certificate)\b',
-            r'\b(University|College|School)\b'
-        ]
-        return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
 
     def _is_contact_info(self, text: str) -> bool:
         """Check if text contains contact information."""

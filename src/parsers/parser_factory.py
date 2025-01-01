@@ -13,19 +13,7 @@ class ParserFactory:
 
     @staticmethod
     def create_parser(parser_type: str, file_path: str) -> BaseParser:
-        """Create a parser instance based on type.
-
-        Args:
-            parser_type: Type of parser to create
-            file_path: Path to resume file
-
-        Returns:
-            Parser instance
-
-        Raises:
-            ValueError: If parser type is invalid or file path is empty
-            FileNotFoundError: If file does not exist
-        """
+        """Create a parser instance based on the parser type."""
         logger.info(f"Creating parser of type '{parser_type}' for file: {file_path}")
 
         try:
@@ -39,11 +27,16 @@ class ParserFactory:
 
             # Create parser based on type
             if parser_type.lower() == 'ats':
+                from .ats_parser import ATSParser
                 return ATSParser(file_path)
             elif parser_type.lower() == 'industry':
+                from .industry_manager_parser import IndustryManagerParser
                 return IndustryManagerParser(file_path)
+            elif parser_type.lower() == 'raw':
+                from .raw_parser import RawParser
+                return RawParser(file_path)
             else:
-                raise ValueError(f"Invalid parser type: {parser_type}")
+                raise ValueError(f"Unknown parser type: {parser_type}")
 
         except Exception as e:
             logger.error(f"Error creating parser: {str(e)}")

@@ -15,6 +15,7 @@ if parent_dir not in sys.path:
 
 from models.model_factory import create_model
 from parsers.parser_factory import ParserFactory
+from models.generic_gpt2_model import GenericGPT2Model
 
 # Set up logging with more detailed format
 logging.basicConfig(
@@ -30,16 +31,19 @@ logger = logging.getLogger(__name__)
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Generate resume summary")
-    parser.add_argument("input_file", help="Path to input resume file")
+    parser.add_argument(
+        "input_file", 
+        help="Path to input resume file"
+    )
     parser.add_argument(
         "--model", 
-        choices=["gpt2", "t5", "bart"], 
+        choices=["gpt2", "t5", "bart", "generic_gpt2"], 
         default="gpt2",
         help="Model to use for generation"
     )
     parser.add_argument(
         "--parser",
-        choices=["ats", "industry"],
+        choices=["ats", "industry", "raw"],
         default="ats",
         help="Parser to use for resume"
     )
@@ -51,6 +55,57 @@ def parse_arguments():
     
     args = parser.parse_args()
     return args
+
+def process_resume(input_file: str, model_type: str, parser_type: str) -> str:
+    """Process a resume file and generate a summary."""
+    try:
+        # Validate input file
+        if not input_file:
+            raise ValueError("Input file path is required")
+        
+        # Convert to absolute path
+        input_file = os.path.abspath(input_file)
+        logger.info(f"Processing resume file: {input_file}")
+        
+        if parser_type == 'raw':
+            # For raw parser, just read the file content
+            parser = ParserFactory.create_parser('raw', input_file)
+            resume_data = parser.parse()
+        else:
+            # Create parser
+            parser = ParserFactory.create_parser(parser_type, input_file)
+            logger.info(f"Created parser of type '{parser_type}' for file: {input_file}")
+            
+            # Parse resume
+            resume_data = parser.parse()
+            if not resume_data:
+                logger.error("Failed to parse resume data")
+                raise ValueError("Failed to parse resume data")
+        
+        # Create model
+        try:
+            model = create_model(model_type)
+        except Exception as e:
+            logger.error(f"Error creating model: {e}")
+            raise
+        
+        # Generate summary
+        if parser_type == 'raw':
+            if not isinstance(model, GenericGPT2Model):
+                raise ValueError("Raw parser can only be used with generic_gpt2 model")
+            summary = model.generate_summary(resume_data)
+        else:
+            try:
+                summary = model.generate_summary(resume_data)
+            except Exception as e:
+                logger.error(f"Error generating summary: {e}")
+                raise
+                
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Error in process_resume: {e}")
+        raise
 
 def main(input_file: str, model_type: str = "gpt2", parser_type: str = "ats", debug: bool = False) -> str:
     """Main function for generating resume summaries.
@@ -76,34 +131,8 @@ def main(input_file: str, model_type: str = "gpt2", parser_type: str = "ats", de
             logger.error(f"Input file not found: {input_file}")
             raise FileNotFoundError(f"Input file not found: {input_file}")
             
-        # Get absolute path
-        input_file = os.path.abspath(input_file)
-        logger.info(f"Processing resume file: {input_file}")
-        
-        # Create parser
-        parser = ParserFactory.create_parser(parser_type, input_file)
-        logger.info(f"Created parser of type '{parser_type}' for file: {input_file}")
-        
-        # Parse resume
-        resume_data = parser.parse(input_file)
-        if not resume_data:
-            logger.error("Failed to parse resume data")
-            raise ValueError("Failed to parse resume data")
-        
-        # Create model
-        try:
-            model = create_model(model_type)
-        except Exception as e:
-            logger.error(f"Error creating model: {e}")
-            raise
-        
-        # Generate summary
-        try:
-            summary = model.generate_summary(resume_data)
-            return summary
-        except Exception as e:
-            logger.error(f"Error generating summary: {e}")
-            raise
+        summary = process_resume(input_file, model_type, parser_type)
+        return summary
         
     except Exception as e:
         logger.error(f"Error in main: {e}")

@@ -7,22 +7,21 @@ from typing import Dict, Any
 
 
 class BaseParser(ABC):
-    """Abstract base class for resume parsers."""
+    """Base class for resume parsers."""
     
-    @abstractmethod
-    def parse(self, file_path: str) -> Dict[str, Any]:
-        """Parse a resume file and extract relevant information.
+    def __init__(self, file_path: str):
+        """Initialize the parser with a file path.
         
         Args:
-            file_path: Path to the resume file to parse
-            
+            file_path: Path to the resume file
+        """
+        self.file_path = file_path
+    
+    @abstractmethod
+    def parse(self) -> Any:
+        """Parse the resume file and return structured data.
+        
         Returns:
-            Dictionary containing parsed resume data with the following keys:
-            - name: Candidate's name
-            - current_role: Current or most recent role
-            - companies: List of companies worked at
-            - years_experience: Total years of experience
-            - skills: List of skills
-            - achievements: List of key achievements
+            Parsed resume data in the appropriate format
         """
         pass

@@ -5,6 +5,7 @@ from typing import Any
 from .gpt2_model import GPT2Model
 from .t5_model import T5ResumeModel
 from .bart_model import BartResumeModel
+from .generic_gpt2_model import GenericGPT2Model
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,7 @@ def create_model(model_type: str, model_size: str = 'base') -> Any:
     """Create a model of the specified type and size.
 
     Args:
-        model_type: Type of model to create (gpt2, t5, or bart)
+        model_type: Type of model to create (gpt2, t5, bart, or generic_gpt2)
         model_size: Size of the model (base, small, medium, large)
 
     Returns:
@@ -26,6 +27,8 @@ def create_model(model_type: str, model_size: str = 'base') -> Any:
 
         if model_type.lower() == 'gpt2':
             return GPT2Model()
+        elif model_type.lower() == 'generic_gpt2':
+            return GenericGPT2Model()
         elif model_type.lower() == 't5':
             return T5ResumeModel()
         elif model_type.lower() == 'bart':
