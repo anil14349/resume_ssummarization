@@ -114,7 +114,7 @@ class GenericGPT2Model(BaseModel):
                     "- Visual: Modern development environment with emerging technology icons.\n\n"
                     "6. Contact\n"
                     "- Caption: Let's Connect\n"
-                    "- Audio: Ready to bring technical expertise to your next challenging project.\n"
+                    f"- Audio: Reach out to me at {email}" + (f" or call me at {resume_data.get('contact_info', {}).get('phone', '')}" if resume_data.get('contact_info', {}).get('phone') else "") + ". I look forward to discussing potential opportunities.\n"
                     "- Visual: Professional contact details with tech-themed background.\n\n"
                 )
             else:
@@ -143,7 +143,7 @@ class GenericGPT2Model(BaseModel):
                     "- Visual: Forward-looking imagery of modern operations.\n\n"
                     "6. Contact\n"
                     "- Caption: Let's Connect\n"
-                    "- Audio: Ready to bring expertise to your establishment.\n"
+                    f"- Audio: I'd love to connect with you about potential opportunities. You can reach me at {email}" + (f" or give me a call at {resume_data.get('contact_info', {}).get('phone', '')}" if resume_data.get('contact_info', {}).get('phone') else "") + ". I'm looking forward to hearing from you.\n"
                     "- Visual: Professional contact details with themed background.\n\n"
                 )
             

@@ -7,6 +7,10 @@ def main():
         'email': 'emily.johnson@email.com',
         'current_role': 'Senior HR Manager',
         'years_experience': 8,
+        'contact_info': {
+            'email': 'emily.johnson@email.com',
+            'phone': '555-123-4567'
+        },
         'skills': [
             'Talent Acquisition',
             'Employee Relations',

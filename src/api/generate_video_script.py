@@ -7,9 +7,9 @@ Usage: python3 generate_video_script.py [resume_path]
 import sys
 import os
 from docx import Document
-from src.models.generic_gpt2_model import GenericGPT2Model
-from src.parsers.ats_parser import ATSParser
-from src.parsers.industry_manager_parser import IndustryManagerParser
+from models.generic_gpt2_model import GenericGPT2Model
+from parsers.ats_parser import ATSParser
+from parsers.industry_manager_parser import IndustryManagerParser
 import logging
 import re
 

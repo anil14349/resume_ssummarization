@@ -4,32 +4,44 @@ from pydantic import BaseModel
 from typing import Optional
 import uvicorn
 import os
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
 from fastapi.responses import Response
 import time
 
-from src.models.generic_gpt2_model import GenericGPT2Model
-from src.parsers.ats_parser import ATSParser
-from src.parsers.industry_manager_parser import IndustryManagerParser
+from models.generic_gpt2_model import GenericGPT2Model
+from parsers.ats_parser import ATSParser
+from parsers.industry_manager_parser import IndustryManagerParser
 
-# Prometheus metrics
-REQUESTS_TOTAL = Counter(
-    'resume_video_requests_total',
-    'Total number of resume video script requests',
-    ['template_type']
-)
+# Initialize model
+gpt2_model = GenericGPT2Model()
 
-PROCESSING_TIME = Histogram(
-    'resume_video_processing_seconds',
-    'Time spent processing resume video script requests',
-    ['template_type']
-)
+# Prometheus metrics - use a try-except to handle duplicate registration
+try:
+    REQUESTS_TOTAL = Counter(
+        'resume_video_requests_total',
+        'Total number of requests processed',
+        ['template_type']
+    )
+except ValueError:
+    REQUESTS_TOTAL = REGISTRY.get_sample_value('resume_video_requests_total')
 
-ERROR_COUNT = Counter(
-    'resume_video_errors_total',
-    'Total number of errors in resume video script generation',
-    ['template_type', 'error_type']
-)
+try:
+    PROCESSING_TIME = Histogram(
+        'resume_video_processing_seconds',
+        'Time spent processing resume',
+        ['template_type']
+    )
+except ValueError:
+    PROCESSING_TIME = REGISTRY.get_sample_value('resume_video_processing_seconds')
+
+try:
+    ERROR_COUNT = Counter(
+        'resume_video_errors_total',
+        'Total number of errors encountered',
+        ['template_type', 'error_type']
+    )
+except ValueError:
+    ERROR_COUNT = REGISTRY.get_sample_value('resume_video_errors_total')
 
 app = FastAPI(
     title="Resume Video Script Generator API",
@@ -45,9 +57,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize models
-gpt2_model = GenericGPT2Model()
 
 class ScriptResponse(BaseModel):
     script: str
@@ -81,7 +90,8 @@ async def generate_script(
             parser = IndustryManagerParser(temp_path)
             template_label = "Industry Manager"
         else:
-            ERROR_COUNT.labels(template_type="unknown", error_type="invalid_template").inc()
+            if ERROR_COUNT:
+                ERROR_COUNT.labels(template_type="unknown", error_type="invalid_template").inc()
             raise HTTPException(
                 status_code=400,
                 detail="Invalid template type. Must be either 'ats' or 'industry'"
@@ -89,21 +99,25 @@ async def generate_script(
         
         # Parse resume and generate script
         resume_data = parser.parse()
+        print('==========================================',resume_data)
         script = gpt2_model.generate_summary(resume_data)
         
-        # Record metrics
-        REQUESTS_TOTAL.labels(template_type=template_label).inc()
-        PROCESSING_TIME.labels(template_type=template_label).observe(time.time() - start_time)
+        # Record metrics if they exist
+        if REQUESTS_TOTAL:
+            REQUESTS_TOTAL.labels(template_type=template_label).inc()
+        if PROCESSING_TIME:
+            PROCESSING_TIME.labels(template_type=template_label).observe(time.time() - start_time)
         
         return ScriptResponse(script=script, template_type=template_label)
     
     except Exception as e:
-        # Record error metrics
-        error_type = type(e).__name__
-        ERROR_COUNT.labels(
-            template_type=template_type.lower(),
-            error_type=error_type
-        ).inc()
+        # Record error metrics if they exist
+        if ERROR_COUNT:
+            error_type = type(e).__name__
+            ERROR_COUNT.labels(
+                template_type=template_type.lower(),
+                error_type=error_type
+            ).inc()
         raise HTTPException(status_code=500, detail=str(e))
     
     finally:

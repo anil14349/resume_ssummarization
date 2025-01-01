@@ -13,7 +13,12 @@ st.set_page_config(
 def main():
     st.title("Resume Video Script Generator 🎥")
     
-    # Sidebar
+    # Template selection
+    template_type = st.selectbox(
+        "Select Resume Template Type",
+        ["ATS/HR Resume", "Industry Manager Resume"]
+    )
+    
     st.sidebar.header("About")
     st.sidebar.info(
         "This application generates video scripts from resume templates. "
@@ -22,13 +27,6 @@ def main():
     
     # Main content
     st.header("Generate Video Script")
-    
-    # Template selection
-    template_type = st.radio(
-        "Select Resume Template Type",
-        options=["ATS/HR Resume", "Industry Manager Resume"],
-        help="Choose the type of resume template you're using"
-    )
     
     # Convert selection to API parameter
     template_param = "ats" if template_type == "ATS/HR Resume" else "industry"
@@ -60,11 +58,21 @@ def main():
                     files = {"file": uploaded_file}
                     data = {"template_type": template_param}
                     
-                    response = requests.post(
-                        "http://localhost:8000/generate-script",
-                        files=files,
-                        data=data
-                    )
+                    # Save the uploaded file temporarily
+                    temp_file = NamedTemporaryFile(delete=False, suffix='.docx')
+                    temp_file.write(uploaded_file.getvalue())
+                    temp_file.close()
+                    
+                    # Make API request
+                    with open(temp_file.name, 'rb') as f:
+                        response = requests.post(
+                            "http://localhost:8000/generate-script",
+                            files={"file": f},
+                            data=data
+                        )
+                    
+                    # Clean up temp file
+                    os.unlink(temp_file.name)
                     
                     if response.status_code == 200:
                         data = response.json()
@@ -93,8 +101,7 @@ def main():
                         if template_type == "ATS/HR Resume":
                             st.info(
                                 "💡 Tip: This script is optimized for HR and recruitment "
-                                "positions, highlighting skills and achievements relevant "
-                                "to human resources."
+                                "audiences, focusing on skills and achievements."
                             )
                         else:
                             st.info(

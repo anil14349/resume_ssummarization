@@ -333,18 +333,57 @@ class ATSParser(BaseParser):
         """Extract current role from text."""
         # Common job titles and levels
         job_titles = [
-            r'(?:senior|lead|principal|staff|chief|head|director|vp|manager|specialist|analyst|coordinator|consultant)',
-            r'(?:software|systems|data|product|project|program|business|marketing|sales|hr|human\s+resources|operations|finance)'
+            r'(?:senior|lead|principal|staff|chief|head|director|vp|manager|specialist|analyst|coordinator|consultant|generalist)',
+            r'(?:software|systems|data|product|project|program|business|marketing|sales|hr|human\s+resources|operations|finance|recruitment)'
         ]
         
-        # Look for role in professional summary
+        # Look for role in professional summary or at the start
         summary_patterns = [
-            r'(?i)(?:^|\n)(?:I am|Currently|Now|Presently)?\s*(?:a|an)\s+([A-Z][a-zA-Z\s]+(?:' + '|'.join(job_titles) + r')(?:\s+at|\s+with|\s+for|\s+in|\.))',
+            # Standard role declarations
+            r'(?i)(?:^|\n)(?:I am|Currently|Now|Presently)?\s*(?:a|an)?\s*([A-Z][a-zA-Z\s]+(?:' + '|'.join(job_titles) + r')(?:\s+at|\s+with|\s+for|\s+in|\s*\n|\s*$|\.))',
             r'(?i)current\s+(?:role|position|title):\s*([^\n]+)',
             r'(?i)(?:^|\n)experienced\s+([A-Z][a-zA-Z\s]+(?:' + '|'.join(job_titles) + r')(?:\s+with|\s+having|\.))',
-            r'(?i)(?:^|\n)([A-Z][a-zA-Z\s]+(?:' + '|'.join(job_titles) + r'))\s+with\s+\d+\+?\s*years?'
+            r'(?i)(?:^|\n)([A-Z][a-zA-Z\s]+(?:' + '|'.join(job_titles) + r'))\s+with\s+\d+\+?\s*years?',
+            
+            # Look for role at document start or after name
+            r'(?i)(?:^|\n)([A-Z][a-zA-Z\s]+(?:' + '|'.join(job_titles) + r'))\s*(?:\n|$)',
+            
+            # Look for role in contact section
+            r'(?i)(?:^|\n)(?:title|position|role):\s*([^\n]+)',
+            
+            # Look for role with company
+            r'(?i)(?:^|\n)([A-Z][a-zA-Z\s]+(?:' + '|'.join(job_titles) + r'))\s*\|\s*[A-Z]',
+            
+            # Look for role in achievements
+            r'(?i)(?:as\s+(?:a|an)\s+|(?:^|\n))([A-Z][a-zA-Z\s]+(?:' + '|'.join(job_titles) + r'))'
         ]
         
+        # First try exact matches for HR roles
+        hr_patterns = [
+            r'(?i)(?:^|\n|\s)(?:Senior\s+)?(?:Human\s+Resources?|HR)\s+(?:Generalist|Manager|Specialist|Coordinator)(?:\s|$|\n)',
+            r'(?i)(?:^|\n|\s)(?:Senior\s+)?(?:Human\s+Resources?|HR)\s+(?:Director|Consultant|Analyst)(?:\s|$|\n)'
+        ]
+        
+        # Try to find the most recent role first
+        experience_section = re.search(r'(?i)(?:experience|employment|work\s+history)[:\n]+(.*?)(?:\n\n|\Z)', text, re.DOTALL)
+        if experience_section:
+            experience_text = experience_section.group(1)
+            # Look for role with date range
+            date_role_pattern = r'(?i)(?:^|\n)(?:20\d{2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*)\s*[-–]\s*(?:PRESENT|20\d{2})\s*\n([^\n|]+)'
+            date_role_match = re.search(date_role_pattern, experience_text)
+            if date_role_match:
+                role = date_role_match.group(1).strip()
+                if 2 <= len(role.split()) <= 6:
+                    return role
+        
+        # Then try HR-specific patterns
+        for pattern in hr_patterns:
+            match = re.search(pattern, text)
+            if match:
+                role = match.group(0).strip()
+                return role
+        
+        # Then try the general patterns
         for pattern in summary_patterns:
             match = re.search(pattern, text)
             if match:
@@ -352,11 +391,10 @@ class ATSParser(BaseParser):
                 # Remove trailing punctuation and company names
                 role = re.sub(r'\s*(?:at|with|for|in)\s+.*$', '', role)
                 role = role.strip(' .,')
-                if 3 <= len(role.split()) <= 6:  # Reasonable length for a title
+                if 2 <= len(role.split()) <= 6:  # Reasonable length for a title
                     return role
         
         # Look for role in experience section
-        experience_section = re.search(r'(?i)(?:experience|employment|work\s+history)[:\n]+(.*?)(?:\n\n|\Z)', text, re.DOTALL)
         if experience_section:
             lines = experience_section.group(1).split('\n')
             for line in lines[:3]:  # Check first few lines
@@ -365,7 +403,19 @@ class ATSParser(BaseParser):
                     match = re.search(rf'(?i)([A-Z][a-zA-Z\s]*{title}[a-zA-Z\s]*)', line)
                     if match:
                         role = match.group(1).strip()
-                        if 3 <= len(role.split()) <= 6:
+                        if 2 <= len(role.split()) <= 6:
+                            return role
+        
+        # Try to extract from achievements or responsibilities
+        achievements_section = re.search(r'(?i)(?:achievements|responsibilities|key\s+accomplishments)[:\n]+(.*?)(?:\n\n|\Z)', text, re.DOTALL)
+        if achievements_section:
+            lines = achievements_section.group(1).split('\n')
+            for line in lines[:3]:
+                for title in job_titles:
+                    match = re.search(rf'(?i)(?:as\s+(?:a|an)\s+|(?:^|\n))([A-Z][a-zA-Z\s]*{title}[a-zA-Z\s]*)', line)
+                    if match:
+                        role = match.group(1).strip()
+                        if 2 <= len(role.split()) <= 6:
                             return role
         
         return ""
@@ -922,25 +972,40 @@ class ATSParser(BaseParser):
         try:
             # Join all text for processing
             full_text = '\n'.join(text_content)
+            logger.debug("Processing text content:")
+            logger.debug("-" * 40)
+            logger.debug(full_text)
+            logger.debug("-" * 40)
             
             # Extract basic information
             self.resume_data['name'] = self._extract_name(full_text)
+            logger.debug(f"Extracted name: {self.resume_data['name']}")
+            
             self.resume_data['current_role'] = self._extract_role(full_text)
+            logger.debug(f"Extracted role: {self.resume_data['current_role']}")
+            
             self.resume_data['skills'] = self._extract_skills(full_text)
+            logger.debug(f"Extracted skills: {self.resume_data['skills']}")
+            
             self.resume_data['companies'] = self._extract_companies(full_text)
+            logger.debug(f"Extracted companies: {self.resume_data['companies']}")
+            
             self.resume_data['years_experience'] = self._extract_years_experience(full_text)
+            logger.debug(f"Extracted years: {self.resume_data['years_experience']}")
             
             # Extract contact information
             contact_info = self._extract_contact_info(full_text)
             if contact_info:
                 self.resume_data['contact_info'] = contact_info
                 self.resume_data['email'] = contact_info.get('email', '')
+            logger.debug(f"Extracted contact: {contact_info}")
             
             # Process achievements
             doc = Document(self.file_path)
             achievements = self._parse_achievements(doc)
             if achievements:
                 self.resume_data['achievements'] = achievements
+            logger.debug(f"Extracted achievements: {achievements}")
             
             # Extract education information
             education_info = []
@@ -961,21 +1026,14 @@ class ATSParser(BaseParser):
                     # Look for degree information
                     degree_match = re.search(r"(?:Bachelor's|Master's|PhD|B\.[A-Z]|M\.[A-Z]|Ph\.D)\s+(?:of|in|degree in)?\s+([^\n]+)", line)
                     if degree_match:
-                        education_entry['degree'] = degree_match.group(0).strip()
-                        
-                    # Look for institution
-                    institution_match = re.search(r"([A-Z][A-Za-z\s]+(?:University|College|Institute))", line)
-                    if institution_match:
-                        education_entry['institution'] = institution_match.group(1).strip()
-                        
-                    # If we have both degree and institution, add to list
-                    if education_entry.get('degree') and education_entry.get('institution'):
-                        education_info.append(education_entry.copy())
+                        education_entry = {'degree': degree_match.group(0)}
+                        education_info.append(education_entry)
                         education_entry = {}
-                        
+            
             if education_info:
                 self.resume_data['education'] = education_info
-                
+            logger.debug(f"Extracted education: {education_info}")
+            
         except Exception as e:
             logger.error(f"Error processing content: {str(e)}")
             raise
