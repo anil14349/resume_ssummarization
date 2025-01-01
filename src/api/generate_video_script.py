@@ -70,11 +70,11 @@ def analyze_resume_content(file_path):
         logger.info("Detected: General Resume (using ATS parser)")
         return "general"
 
-def determine_parser(file_path):
+def determine_parser(parser_type, file_path):
     """Determine which parser to use based on content analysis."""
-    resume_type = analyze_resume_content(file_path)
+    #resume_type = analyze_resume_content(file_path)
     
-    if resume_type == "industry":
+    if parser_type == "industry":
         return IndustryManagerParser(file_path)
     else:  # technical or general
         return ATSParser(file_path)
@@ -83,9 +83,14 @@ def main():
     # Get resume path from command line or use default
     if len(sys.argv) > 1:
         resume_path = sys.argv[1]
+        logger.info(f"Resume path provided: {resume_path}")
+        parser_type = sys.argv[2]
+        logger.info(f"Resume type provided: {parser_type}")
     else:
         # Default to industry manager resume if no path provided
-        resume_path = "src/templates/Industry manager resume.docx"
+        resume_path = "src/templates/ATS classic HR resume.docx"
+        parser_type = "ats"
+        #resume_path = "src/templates/Industry manager resume.docx"
     
     # Ensure the file exists
     if not os.path.exists(resume_path):
@@ -94,7 +99,7 @@ def main():
     
     try:
         # Initialize parser and model
-        parser = determine_parser(resume_path)
+        parser = determine_parser(parser_type, resume_path)
         model = GenericGPT2Model()
         
         # Parse resume

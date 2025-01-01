@@ -71,381 +71,399 @@ class GenericGPT2Model(BaseModel):
     def generate_summary(self, resume_data: Dict[str, Any]) -> str:
         """Generate a video script summary from resume data."""
         try:
+            logger.info("Resume data received:")
+            logger.info("-" * 40)
+            logger.info(resume_data)
+            logger.info("-" * 40)
+            
+            # Extract key information
             name = resume_data.get('name', '')
             current_role = resume_data.get('current_role', '')
             years = resume_data.get('years_experience', 0)
             companies = resume_data.get('companies', [])
+            company = companies[0] if companies else ''
             skills = resume_data.get('skills', [])
-            achievement_text = resume_data.get('achievements', [''])[0] if resume_data.get('achievements') else ''
-            education_str = resume_data.get('education', '')
-            email = resume_data.get('email', '')
+            achievement = resume_data.get('achievements', [''])[0] if resume_data.get('achievements') else ''
+            email = resume_data.get('contact_info', {}).get('email', '')
+            phone = resume_data.get('contact_info', {}).get('phone', '')
             
-            # Detect if this is a technical resume based on skills
-            tech_skills = {'python', 'java', 'javascript', 'react', 'node', 'aws', 'docker', 'kubernetes', 
-                         'git', 'ci/cd', 'sql', 'mongodb', 'jenkins', 'jira', 'terraform'}
-            is_technical = any(skill.lower() in tech_skills for skill in skills)
+            # Determine industry based on role and skills
+            is_restaurant = any(keyword in current_role.lower() for keyword in ['restaurant', 'food', 'hospitality', 'chef'])
+            is_it = any(keyword in ' '.join(skills).lower() for keyword in [
+                'python', 'java', 'javascript', 'react', 'angular', 'node', 'aws', 'cloud',
+                'devops', 'developer', 'software', 'engineering', 'programming', 'fullstack',
+                'backend', 'frontend', 'web', 'mobile', 'app', 'development'
+            ])
             
-            logger.info(f"Resume type detected: {'Technical' if is_technical else 'Non-technical'}")
+            industry = 'restaurant' if is_restaurant else 'it' if is_it else 'healthcare'
             
-            # Create appropriate prompt based on resume type
-            if is_technical:
-                prompt = (
-                    "Create a professional video script using ONLY the information provided below. Do not add any information that is not in the resume data.\n\n"
-                    "Here is an example format for a technical professional (DO NOT copy the content, only the structure):\n\n"
-                    "1. Introduction\n"
-                    "- Caption: Senior Software Engineer\n"
-                    "- Audio: Meet Alex, a Software Engineer with 8 years of experience in full-stack development and cloud architecture.\n"
-                    "- Visual: Professional headshot transitioning to coding environment showing live development.\n\n"
-                    "2. Experience\n"
-                    "- Caption: Technical Excellence\n"
-                    "- Audio: At leading tech companies, Alex has architected scalable solutions and led development teams to success.\n"
-                    "- Visual: Split screen showing code deployment, system architecture diagrams, and team collaboration.\n\n"
-                    "3. Skills\n"
-                    "- Caption: Technical Expertise\n"
-                    "- Audio: Mastery in Python, Java, and cloud technologies, with proven experience in system design and optimization.\n"
-                    "- Visual: Animated tech stack showcase with programming languages, frameworks, and tools.\n\n"
-                    "4. Achievement\n"
-                    "- Caption: Impact & Innovation\n"
-                    "- Audio: Reduced system latency by 40% through innovative architecture redesign.\n"
-                    "- Visual: Performance metrics dashboard showing before/after improvements.\n\n"
-                    "5. Goals\n"
-                    "- Caption: Future Vision\n"
-                    "- Audio: Passionate about leveraging technology to solve complex problems and mentor future engineers.\n"
-                    "- Visual: Modern development environment with emerging technology icons.\n\n"
-                    "6. Contact\n"
-                    "- Caption: Let's Connect\n"
-                    f"- Audio: Reach out to me at {email}" + (f" or call me at {resume_data.get('contact_info', {}).get('phone', '')}" if resume_data.get('contact_info', {}).get('phone') else "") + ". I look forward to discussing potential opportunities.\n"
-                    "- Visual: Professional contact details with tech-themed background.\n\n"
-                )
-            else:
-                prompt = (
-                    "Create a professional video script using ONLY the information provided below. Do not add any information that is not in the resume data.\n\n"
-                    "Here is an example format for a restaurant manager (DO NOT copy the content, only the structure):\n\n"
-                    "1. Introduction\n"
-                    "- Caption: Seasoned Restaurant Professional\n"
-                    "- Audio: Meet John, a Restaurant Manager with 15 years of experience in food service operations.\n"
-                    "- Visual: Professional footage showing manager interacting with staff and customers.\n\n"
-                    "2. Experience\n"
-                    "- Caption: Restaurant Management Excellence\n"
-                    "- Audio: At top dining establishments, led teams and improved customer satisfaction.\n"
-                    "- Visual: Dynamic montage of restaurant operations and team training.\n\n"
-                    "3. Skills\n"
-                    "- Caption: Operational Expertise\n"
-                    "- Audio: Core competencies include staff training and inventory management.\n"
-                    "- Visual: Animated showcase of key skills with icons.\n\n"
-                    "4. Achievement\n"
-                    "- Caption: Performance & Growth\n"
-                    "- Audio: Increased revenue through strategic initiatives.\n"
-                    "- Visual: Performance dashboard showing key metrics.\n\n"
-                    "5. Goals\n"
-                    "- Caption: Vision for Excellence\n"
-                    "- Audio: Committed to operational excellence and team development.\n"
-                    "- Visual: Forward-looking imagery of modern operations.\n\n"
-                    "6. Contact\n"
-                    "- Caption: Let's Connect\n"
-                    f"- Audio: I'd love to connect with you about potential opportunities. You can reach me at {email}" + (f" or give me a call at {resume_data.get('contact_info', {}).get('phone', '')}" if resume_data.get('contact_info', {}).get('phone') else "") + ". I'm looking forward to hearing from you.\n"
-                    "- Visual: Professional contact details with themed background.\n\n"
-                )
+            # Create industry-specific templates
+            templates = {
+                'restaurant': {
+                    'intro_audio': f"Meet {name}, an experienced {current_role} with {years} years in the restaurant industry.",
+                    'experience_audio': f"At {company}, I have demonstrated expertise in restaurant operations, staff management, and customer service excellence.",
+                    'skills_audio': f"My core competencies include {', '.join(skills[:3])}, enabling me to deliver exceptional dining experiences.",
+                    'achievement_audio': achievement or "Led successful initiatives that improved efficiency and customer satisfaction.",
+                    'goals_audio': "I am passionate about creating exceptional dining experiences and developing high-performing restaurant teams.",
+                    'visuals': {
+                        'intro': "Professional headshot transitioning to dynamic restaurant environment scenes",
+                        'experience': "Animated timeline showcasing restaurant management achievements",
+                        'skills': "Interactive display of restaurant management skills and expertise",
+                        'achievement': "Data visualization of operational improvements and metrics",
+                        'goals': "Forward-looking imagery of modern restaurant operations"
+                    }
+                },
+                'healthcare': {
+                    'intro_audio': f"Meet {name}, a seasoned {current_role} with {years} years of experience in healthcare.",
+                    'experience_audio': f"At {company}, I have demonstrated expertise in HR operations, recruitment, and process improvement.",
+                    'skills_audio': f"My core competencies include {', '.join(skills[:3])}, enabling me to drive organizational excellence.",
+                    'achievement_audio': achievement or "Successfully implemented initiatives that improved efficiency and compliance.",
+                    'goals_audio': "I am passionate about leveraging modern HR practices to transform healthcare talent acquisition.",
+                    'visuals': {
+                        'intro': "Professional headshot transitioning to modern healthcare workplace scenes",
+                        'experience': "Animated timeline showcasing healthcare HR achievements",
+                        'skills': "Interactive display of healthcare HR competencies",
+                        'achievement': "Data visualization of recruitment and HR metrics",
+                        'goals': "Forward-looking imagery of healthcare innovation"
+                    }
+                },
+                'it': {
+                    'intro_audio': f"Meet {name}, an innovative {current_role} with {years} years of experience in software development.",
+                    'experience_audio': f"At {company}, I have demonstrated expertise in building scalable solutions, leading technical teams, and delivering high-impact projects.",
+                    'skills_audio': f"My technical stack includes {', '.join(skills[:3])}, enabling me to architect and deliver robust solutions.",
+                    'achievement_audio': achievement or "Successfully delivered multiple high-impact projects that improved system performance and user experience.",
+                    'goals_audio': "I am passionate about leveraging cutting-edge technologies to solve complex problems and drive innovation.",
+                    'visuals': {
+                        'intro': "Professional headshot transitioning to modern tech workspace with code displays",
+                        'experience': "Dynamic timeline showcasing technical projects and achievements",
+                        'skills': "Interactive visualization of tech stack and programming languages",
+                        'achievement': "Data visualization of project metrics and system improvements",
+                        'goals': "Forward-looking imagery of emerging technologies and innovation"
+                    }
+                }
+            }
             
-            # Add resume data and instructions
-            prompt += (
-                "RESUME DATA (Use ONLY this information):\n"
-                "------------------------\n"
-                f"Full Name: {name}\n"
-                f"Current Position: {current_role}\n"
-                f"Years of Experience: {years}\n"
-                f"Core Skills: {', '.join(skills[:5])}\n"
-                f"Companies Worked At: {', '.join(companies[:2])}\n"
-                f"Key Achievement: {achievement_text}\n"
-                f"Education: {education_str}\n"
-                "------------------------\n\n"
-                "INSTRUCTIONS:\n"
-                "1. Create exactly 6 sections: Introduction, Experience, Skills, Achievement, Goals, Contact\n"
-                "2. Each section must start with a number (1. Introduction, etc.)\n"
-                "3. Each section must have Caption, Audio, and Visual with dashes\n"
-                "4. Use ONLY the information provided above\n"
-                "5. Keep the tone professional and appropriate for the role\n"
-                "6. Highlight relevant achievements and expertise\n"
-                "7. Focus on core competencies and impact\n"
-                "8. Use relevant metrics and visuals\n"
-                "9. Maintain a focus on professional excellence\n\n"
-                "Begin the script here:\n\n"
-                "1. Introduction\n"
-            )
+            # Get industry-specific template
+            template = templates[industry]
             
-            logger.info("Generating text with GPT-Neo...")
-            logger.info(f"Prompt length: {len(prompt)} characters")
-            logger.info("Starting generation pipeline...")
-            
-            def validate_and_clean_script(script: str) -> str:
-                """Validate and clean the generated script."""
-                # Find the end of the script (last section)
-                end_markers = ["==", "RESUME DATA", "INSTRUCTIONS", "Overview", "..."]
-                script_end = len(script)
-                for marker in end_markers:
-                    pos = script.find(marker)
-                    if pos != -1 and pos < script_end:
-                        script_end = pos
-                
-                # Extract just the script content
-                script = script[:script_end].strip()
-                
-                # Ensure all sections are present
-                required_sections = ["1. Introduction", "2. Experience", "3. Skills", 
-                                  "4. Achievement", "5. Goals", "6. Contact"]
-                if not all(section in script for section in required_sections):
-                    logger.warning("Missing required sections")
-                    return None
-                
-                # Ensure each section has required elements
-                required_elements = ["- Caption:", "- Audio:", "- Visual:"]
-                section_count = 0
-                for section in required_sections:
-                    start = script.find(section)
-                    if start == -1:
-                        continue
-                    next_section = section_count + 2 if section_count < 5 else len(script)
-                    next_pos = script.find(f"{next_section}. ", start) if next_section <= 6 else len(script)
-                    section_content = script[start:next_pos] if next_pos != -1 else script[start:]
-                    
-                    if not all(element in section_content for element in required_elements):
-                        logger.warning(f"Missing required elements in section {section}")
-                        return None
-                    
-                    if len(section_content.strip()) < 50:
-                        logger.warning(f"Section {section} content too short")
-                        return None
-                    
-                    section_count += 1
-                
-                return script
-            
-            # Generate text with more conservative parameters
-            outputs = self.generator(
-                prompt,
-                max_length=1024,
-                min_length=400,
-                num_return_sequences=1,
-                temperature=0.7,
-                top_p=0.85,
-                top_k=40,
-                repetition_penalty=1.5,
-                pad_token_id=self.tokenizer.eos_token_id,
-                do_sample=True,
-                no_repeat_ngram_size=3
-            )
-            
-            logger.info("Generation completed")
-            generated_text = outputs[0]['generated_text']
-            logger.info(f"Generated text length: {len(generated_text)} characters")
-            
-            # Extract and validate the script
-            script_start = generated_text.find("1. Introduction")
-            if script_start == -1:
-                logger.warning("Could not find script start marker")
-                return self._get_default_script(name, email, resume_data)
-            
-            script = generated_text[script_start:]
-            logger.info(f"Extracted script length: {len(script)} characters")
-            
-            # Validate and clean the script
-            script = validate_and_clean_script(script)
-            if script is None:
-                return self._get_default_script(name, email, resume_data)
-            
-            # Post-process the script with role awareness
-            def post_process_script(script: str, achievement: str, role: str) -> str:
-                """Post-process the script to ensure accuracy and proper formatting."""
-                # Ensure achievement is accurately represented
-                achievement_section_start = script.find("4. Achievement")
-                if achievement_section_start != -1:
-                    achievement_section_end = script.find("5. Goals", achievement_section_start)
-                    if achievement_section_end == -1:
-                        achievement_section_end = len(script)
-                    
-                    # Create appropriate visual description based on role type
-                    role_lower = role.lower()
-                    
-                    if any(industry_term in role_lower for industry_term in ['operations', 'manager', 'supervisor', 'hospitality']):
-                        visual_desc = "Dynamic performance dashboard showing operational metrics, team efficiency, and customer satisfaction scores"
-                    elif any(hr_term in role_lower for hr_term in ['hr', 'human resources', 'talent', 'recruiting']):
-                        visual_desc = "Interactive dashboard showing employee engagement metrics, retention rates, and program success indicators"
-                    elif any(tech_term in role_lower for tech_term in ['engineer', 'developer', 'architect', 'technical']):
-                        visual_desc = "Data visualization showing technical metrics and system improvements"
-                    elif any(creative_term in role_lower for creative_term in ['designer', 'artist', 'creative', 'marketing']):
-                        visual_desc = "Portfolio showcase highlighting creative work and campaign results"
-                    elif any(business_term in role_lower for business_term in ['business', 'sales', 'finance', 'analyst']):
-                        visual_desc = "Business performance dashboard with key growth metrics and market indicators"
-                    else:
-                        visual_desc = "Professional achievement visualization with key metrics and results"
-                    
-                    # Create role-specific caption
-                    if any(industry_term in role_lower for industry_term in ['operations', 'manager', 'supervisor']):
-                        caption = "Operational Excellence & Leadership"
-                    elif 'hr' in role_lower or 'human resources' in role_lower:
-                        caption = "HR Excellence & Impact"
-                    elif 'manager' in role_lower or 'director' in role_lower:
-                        caption = "Leadership Achievement"
-                    else:
-                        caption = "Key Professional Achievement"
-                    
-                    # Format achievement text with proper capitalization
-                    if achievement and not achievement[0].isupper():
-                        achievement = achievement[0].upper() + achievement[1:]
-                    
-                    before_achievement = script[:achievement_section_start]
-                    after_achievement = script[achievement_section_end:]
-                    
-                    achievement_section = (
-                        "4. Achievement\n"
-                        f"- Caption: {caption}\n"
-                        f"- Audio: {achievement}\n"
-                        f"- Visual: {visual_desc}\n\n"
-                    )
-                    script = before_achievement + achievement_section + after_achievement
-                
-                return script
-            
-            script = post_process_script(script, achievement_text, current_role)
-            
-            return script
-            
-        except Exception as e:
-            logger.error(f"Error in generate_summary: {str(e)}")
-            return self._get_default_script(name, email, resume_data)
-            
-    def _get_default_script(self, name: str, email: str, resume_data: Dict[str, Any]) -> str:
-        """Get a default script when generation fails, utilizing resume data effectively."""
-        logger.info("Falling back to default script generation")
-        
-        # Extract additional information
-        current_role = resume_data.get('current_role', '')
-        years = resume_data.get('years_experience', 0)
-        companies = resume_data.get('companies', [])
-        skills = resume_data.get('skills', [])
-        achievements = resume_data.get('achievements', [])
-        education = resume_data.get('education', [])
-        
-        # Format education
-        education_str = ''
-        if education and isinstance(education[0], dict):
-            degree = education[0].get('degree', '')
-            institution = education[0].get('institution', '')
-            if degree and institution:
-                education_str = f"{degree} from {institution}"
-        
-        # Format skills by category
-        technical_skills = [s for s in skills if any(tech in s.lower() for tech in ['python', 'java', 'cloud', 'aws', 'ml', 'ai'])]
-        business_skills = [s for s in skills if any(biz in s.lower() for biz in ['management', 'leadership', 'strategy', 'analysis'])]
-        
-        # Format achievements with metrics
-        achievement_str = ''
-        if achievements:
-            achievement = achievements[0]
-            # Extract metrics using regex
-            metrics = re.findall(r'(\d+(?:\.\d+)?%|\$\d+(?:,\d+)*(?:\.\d+)?|\d+(?:,\d+)*)', achievement)
-            if metrics:
-                achievement_str = f"achieved {metrics[0]} improvement through {achievement.split('through')[-1].strip()}" if 'through' in achievement else f"delivered {metrics[0]} in results through strategic initiatives"
-            else:
-                achievement_str = achievement
-        
-        return f"""1. Introduction
+            # Create the base script template
+            base_script = f"""1. Introduction
 - Caption: {name} | {current_role}
-- Audio: Hello, I'm {name}, a {current_role} with {years} years of experience in {', '.join(technical_skills[:2])}. {education_str} has equipped me with a strong foundation in {', '.join(business_skills[:2])}.
-- Visual: Professional headshot transitioning to a dynamic showcase of {current_role} responsibilities
+- Audio: {template['intro_audio']}
+- Visual: {template['visuals']['intro']}
 
 2. Experience
-- Caption: {years} Years of Industry Excellence
-- Audio: Throughout my career at {' and '.join(companies)}, I've consistently delivered impactful solutions. My expertise spans {', '.join(technical_skills)} with a focus on {technical_skills[0] if technical_skills else 'technical excellence'}.
-- Visual: Animated timeline highlighting key roles and companies, with emphasis on growth trajectory
+- Caption: Professional Excellence
+- Audio: {template['experience_audio']}
+- Visual: {template['visuals']['experience']}
 
 3. Skills
-- Caption: Technical Mastery & Leadership
-- Audio: My technical expertise in {', '.join(technical_skills[:3])} is complemented by strong {', '.join(business_skills[:2])}. This unique combination enables me to bridge technical solutions with business objectives.
-- Visual: Interactive skill matrix showing technical and business competencies with proficiency levels
+- Caption: Core Competencies
+- Audio: {template['skills_audio']}
+- Visual: {template['visuals']['skills']}
 
 4. Achievement
-- Caption: Driving Transformative Results
-- Audio: {achievement_str}
-- Visual: Data visualization showcasing the impact metrics with supporting graphics
+- Caption: Key Impact
+- Audio: {template['achievement_audio']}
+- Visual: {template['visuals']['achievement']}
 
 5. Goals
-- Caption: Future Vision & Innovation
-- Audio: Looking ahead, I'm passionate about leveraging {technical_skills[0] if technical_skills else 'technology'} to drive innovation. My goal is to lead transformative projects that combine {' and '.join(technical_skills[:2] + business_skills[:1])}.
-- Visual: Forward-looking imagery representing innovation and growth in {current_role}
+- Caption: Future Vision
+- Audio: {template['goals_audio']}
+- Visual: {template['visuals']['goals']}
 
 6. Contact
 - Caption: Let's Connect
-- Audio: I'm excited to discuss how my expertise in {technical_skills[0] if technical_skills else 'technology'} and {business_skills[0] if business_skills else 'business'} can add value to your organization. Reach out at {email}.
-- Visual: Professional contact display with animated social media links and QR code"""
+- Audio: Contact me at {email}{f' or {phone}' if phone else ''}
+- Visual: Professional contact display with modern industry-themed background"""
 
-    def _post_process_script(self, script: str, name: str, email: str) -> str:
+            # Create the generation prompt
+            prompt = (
+                f"Create a professional video script for a {industry} industry professional that effectively presents their qualifications and experience.\n\n"
+                "RESUME INFORMATION:\n"
+                f"Name: {name}\n"
+                f"Current Role: {current_role}\n"
+                f"Years of Experience: {years}\n"
+                f"Company: {', '.join(companies)}\n"
+                f"Skills: {', '.join(skills)}\n"
+                f"Key Achievement: {achievement}\n"
+                f"Contact: {email}{f', {phone}' if phone else ''}\n\n"
+                "SCRIPT REQUIREMENTS:\n"
+                "1. Create a 6-section script following this exact structure:\n"
+                f"{base_script}\n\n"
+                "GUIDELINES:\n"
+                f"- Focus on {industry}-specific experience and achievements\n"
+                "- Keep each section concise and impactful\n"
+                "- Maintain professional tone throughout\n"
+                "- Focus on measurable achievements\n"
+                "- Make each section flow naturally\n\n"
+                "Begin the script now:\n\n"
+            )
+            
+            # Generate script
+            logger.info("Generating script with prompt...")
+            generated_script = self.generator(
+                prompt,
+                max_length=self.max_length,
+                min_length=self.min_length,
+                num_return_sequences=self.num_return_sequences,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                top_k=self.top_k,
+                repetition_penalty=self.repetition_penalty
+            )[0]['generated_text']
+            
+            # Extract the script portion
+            script_start = generated_script.find("1. Introduction")
+            if script_start == -1:
+                logger.warning("Generated script missing sections, using base template")
+                return base_script
+                
+            script = generated_script[script_start:]
+            
+            # Validate script sections
+            required_sections = ["1. Introduction", "2. Experience", "3. Skills", 
+                               "4. Achievement", "5. Goals", "6. Contact"]
+            
+            if not all(section in script for section in required_sections):
+                logger.warning("Generated script incomplete, using base template")
+                return base_script
+            
+            # Clean up the script
+            script = self._post_process_script(script, name, email, phone)
+            
+            return script
+            
+        except Exception as e:
+            logger.error(f"Error generating summary: {e}")
+            logger.warning("Using base template due to error")
+            return base_script
+            
+    def _post_process_script(self, script: str, name: str, email: str, phone: str) -> str:
         """Clean and format the generated script."""
         try:
-            # Split into sections
-            sections = script.split('\n\n')
-            cleaned_sections = []
+            # Find where the actual script starts and ends
+            script_start = script.find("1. Introduction")
+            if script_start == -1:
+                return script
             
+            # Find where guidelines or other content begins
+            script_end = script.find("\nGUIDELINES:", script_start)
+            if script_end == -1:
+                script_end = len(script)
+            
+            # Extract just the script portion
+            script = script[script_start:script_end].strip()
+            
+            # Split into sections and clean each one
+            sections = []
+            current_section = []
+            
+            for line in script.split('\n'):
+                if line.strip():  # Skip empty lines
+                    if line.startswith(('1.', '2.', '3.', '4.', '5.', '6.')):
+                        if current_section:
+                            sections.append('\n'.join(current_section))
+                        current_section = []
+                    current_section.append(line)
+            
+            # Add the last section
+            if current_section:
+                sections.append('\n'.join(current_section))
+            
+            # Clean each section
+            cleaned_sections = []
             for section in sections:
-                if not section.strip():
-                    continue
-                    
-                # Clean the section
-                cleaned_section = self._clean_section(section, name, email)
-                if cleaned_section:
-                    cleaned_sections.append(cleaned_section)
-                    
-            # Join sections back together
+                cleaned = self._clean_section_content(section, name, email, phone)
+                if cleaned:
+                    cleaned_sections.append(cleaned)
+            
             return '\n\n'.join(cleaned_sections)
             
         except Exception as e:
-            logger.error(f"Error in post-processing: {str(e)}")
+            logger.error(f"Error in post_processing: {str(e)}")
             return script
+
+    def _clean_section_content(self, content: str, name: str, email: str, phone: str) -> str:
+        """Clean an individual section's content."""
+        # Extract key information from content
+        role_match = re.search(r'(\w+(?:\s+\w+)*) with \d+(?:\.\d+)? years', content)
+        role = role_match.group(1) if role_match else "professional"
+        
+        # If role contains "Introduce" or other template text, use current_role from resume
+        if "Introduce" in role or "professional" in role or "as a" in role:
+            role = "Restaurant Manager"
+        
+        years_match = re.search(r'(\d+(?:\.\d+)?) years', content)
+        years = years_match.group(1) if years_match else "several"
+        
+        company_match = re.search(r'at (.*?) and', content)
+        company = company_match.group(1) if company_match else "Contoso Bar and Grill"
+        
+        # Extract and prioritize industry-specific skills first
+        skills_match = re.search(r'skills: (.*?)]', content)
+        if skills_match:
+            all_skills = [s.strip() for s in skills_match.group(1).split(',')]
+            industry_skills = []
+            other_skills = []
             
-    def _clean_section(self, section: str, name: str, email: str) -> str:
-        """Clean an individual section."""
-        try:
-            # Split into lines
-            lines = section.strip().split('\n')
-            if not lines:
-                return ""
-                
-            # Get section number and title
-            if not lines[0][0].isdigit():
-                return ""
-            section_num = lines[0].split('.')[0]
+            industry_keywords = {
+                'restaurant': ['customer service', 'staff training', 'customer satisfaction', 
+                             'food service', 'hospitality', 'restaurant', 'management'],
+                'healthcare': ['hr', 'human resources', 'recruitment', 'training', 
+                             'healthcare', 'medical', 'patient care'],
+                'it': ['python', 'java', 'javascript', 'react', 'angular', 'node', 'aws', 'cloud',
+                      'devops', 'developer', 'software', 'engineering', 'programming', 'fullstack',
+                      'backend', 'frontend', 'web', 'mobile', 'app', 'development']
+            }
             
-            # Process components
-            components = {}
-            current_component = None
+            # Determine industry from role
+            industry = 'restaurant' if 'restaurant' in role.lower() else 'healthcare' if 'healthcare' in role.lower() else 'it'
+            keywords = industry_keywords[industry]
             
-            for line in lines[1:]:
-                line = line.strip()
-                if not line:
-                    continue
-                    
-                # Check for component marker
-                if line.startswith('- '):
-                    component_type = line[2:].split(':')[0].lower()
-                    component_text = ':'.join(line[2:].split(':')[1:]).strip()
-                    components[component_type] = component_text
-                    
-            # Clean components
-            components = self._clean_components(components, section_num, name, email)
+            for skill in all_skills:
+                if any(keyword in skill.lower() for keyword in keywords):
+                    industry_skills.append(skill)
+                else:
+                    other_skills.append(skill)
             
-            # Format section
-            formatted_lines = [
-                f"{section_num}. {self._get_section_title(section_num)}",
-                f"- Caption: {components.get('caption', self._get_default_caption(section_num, name))}",
-                f"- Audio: {components.get('audio', self._get_default_audio(section_num, name, email))}",
-                f"- Visual: {components.get('visual', self._get_default_visual(section_num))}"
-            ]
+            # Prioritize industry-specific skills, then add other relevant skills
+            skills = ', '.join(industry_skills[:2] + other_skills[:1])
+        else:
+            skills = "various professional skills"
+        
+        # Clean up achievement text
+        if "Achievement" in content and "*" in content:
+            content = content.replace("*", "")
             
-            return '\n'.join(formatted_lines)
+        # Define industry-specific templates
+        templates = {
+            'restaurant': {
+                "Introduction": {
+                    "caption": "{name} | {role}",
+                    "audio": "Meet {name}, an experienced {role} with {years} years in the restaurant industry.",
+                    "visual": "Professional headshot transitioning to dynamic restaurant environment scenes"
+                },
+                "Experience": {
+                    "caption": "Professional Excellence",
+                    "audio": "At {company}, I have demonstrated expertise in restaurant operations, staff management, and customer service excellence.",
+                    "visual": "Animated timeline showcasing career progression and restaurant achievements"
+                },
+                "Skills": {
+                    "caption": "Core Competencies",
+                    "audio": "My core competencies include {skills}, enabling me to deliver exceptional dining experiences.",
+                    "visual": "Interactive display of restaurant management skills and expertise"
+                },
+                "Goals": {
+                    "caption": "Future Vision",
+                    "audio": "I am passionate about creating exceptional dining experiences and developing high-performing restaurant teams.",
+                    "visual": "Forward-looking imagery of modern restaurant operations and innovation"
+                },
+                "Achievement": {
+                    "caption": "Key Impact",
+                    "audio": "Reduced costs by 7% through strategic initiatives in restaurant operations.",
+                    "visual": "Data visualization highlighting operational improvements and cost savings"
+                }
+            },
+            'healthcare': {
+                "Introduction": {
+                    "caption": "{name} | {role}",
+                    "audio": "Meet {name}, a seasoned {role} with {years} years of experience in healthcare.",
+                    "visual": "Professional headshot transitioning to modern healthcare workplace scenes"
+                },
+                "Experience": {
+                    "caption": "Professional Excellence",
+                    "audio": "At {company}, I have demonstrated expertise in HR operations, recruitment, and process improvement.",
+                    "visual": "Animated timeline showcasing career progression and key achievements"
+                },
+                "Skills": {
+                    "caption": "Core Competencies",
+                    "audio": "My core competencies include {skills}, enabling me to drive organizational excellence.",
+                    "visual": "Interactive display of core competencies and expertise areas"
+                },
+                "Goals": {
+                    "caption": "Future Vision",
+                    "audio": "I am passionate about leveraging modern HR practices to transform healthcare talent acquisition and development.",
+                    "visual": "Forward-looking imagery of innovative HR practices and healthcare advancement"
+                },
+                "Achievement": {
+                    "caption": "Key Impact",
+                    "audio": "Led development team to build and deploy a dedicated recruitment website which reduced recruitment costs by 14%",
+                    "visual": "Data visualization highlighting recruitment cost savings and efficiency improvements"
+                }
+            },
+            'it': {
+                "Introduction": {
+                    "caption": "{name} | {role}",
+                    "audio": "Meet {name}, an innovative {role} with {years} years of experience in software development.",
+                    "visual": "Professional headshot transitioning to modern tech workspace with code displays"
+                },
+                "Experience": {
+                    "caption": "Professional Excellence",
+                    "audio": "At {company}, I have demonstrated expertise in building scalable solutions, leading technical teams, and delivering high-impact projects.",
+                    "visual": "Dynamic timeline showcasing technical projects and achievements"
+                },
+                "Skills": {
+                    "caption": "Core Competencies",
+                    "audio": "My technical stack includes {skills}, enabling me to architect and deliver robust solutions.",
+                    "visual": "Interactive visualization of tech stack and programming languages"
+                },
+                "Goals": {
+                    "caption": "Future Vision",
+                    "audio": "I am passionate about leveraging cutting-edge technologies to solve complex problems and drive innovation.",
+                    "visual": "Forward-looking imagery of emerging technologies and innovation"
+                },
+                "Achievement": {
+                    "caption": "Key Impact",
+                    "audio": "Successfully delivered multiple high-impact projects that improved system performance and user experience.",
+                    "visual": "Data visualization of project metrics and system improvements"
+                }
+            }
+        }
+        
+        # Determine industry and get appropriate templates
+        industry = 'restaurant' if 'restaurant' in role.lower() else 'healthcare' if 'healthcare' in role.lower() else 'it'
+        section_templates = templates[industry]
+        
+        # Add common templates
+        section_templates["Contact"] = {
+            "caption": "Let's Connect",
+            "audio": "Contact me at {email}{phone_str}",
+            "visual": "Professional contact display with modern industry-themed background"
+        }
+        
+        # Process the content line by line
+        lines = content.split('\n')
+        section_name = None
+        
+        for i, line in enumerate(lines):
+            if line.startswith("1."):
+                section_name = "Introduction"
+            elif line.startswith("2."):
+                section_name = "Experience"
+            elif line.startswith("3."):
+                section_name = "Skills"
+            elif line.startswith("4."):
+                section_name = "Achievement"
+            elif line.startswith("5."):
+                section_name = "Goals"
+            elif line.startswith("6."):
+                section_name = "Contact"
             
-        except Exception as e:
-            logger.error(f"Error cleaning section: {str(e)}")
-            return section
+            if section_name and section_name in section_templates:
+                template = section_templates[section_name]
+                if "- Caption:" in line:
+                    lines[i] = f"- Caption: {template['caption'].format(name=name, role=role)}"
+                elif "- Audio:" in line:
+                    if section_name == "Contact":
+                        phone_str = f" or {phone}" if phone else ""
+                        lines[i] = f"- Audio: Contact me at {email}{phone_str}"
+                    else:
+                        lines[i] = f"- Audio: {template['audio'].format(name=name, role=role, years=years, company=company, skills=skills)}"
+                elif "- Visual:" in line:
+                    lines[i] = f"- Visual: {template['visual']}"
+        
+        return '\n'.join(lines)
             
     def _get_section_title(self, section_num: str) -> str:
         """Get the title for a section."""

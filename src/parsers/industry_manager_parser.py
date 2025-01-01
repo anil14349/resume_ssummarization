@@ -116,8 +116,11 @@ class IndustryManagerParser(BaseParser):
         parts = [part.strip() for part in first_line.split('|')]
 
         for part in parts:
-            if '@' in part:
-                contact_info['email'] = part.strip()
+            # Extract email
+            email_match = re.search(r'([^@\s]+@[^@\s]+\.[^@\s]+)', part)
+            if email_match:
+                contact_info['email'] = email_match.group(1).strip()
+            # Extract phone
             elif re.search(r'\(\d{3}\)', part):
                 # Format phone as expected by models
                 phone = re.sub(r'[^\d]', '', part)
