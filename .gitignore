@@ -67,3 +67,5 @@ logs/
 *.csv
 *.json
 
+*.model_cache
+*.lock

@@ -13,31 +13,32 @@ logger = logging.getLogger(__name__)
 class IndustryManagerParser(BaseParser):
     """Parser for industry manager resumes."""
     
-    def __init__(self, file_path: str = None):
+    def __init__(self, file_path: str):
         """Initialize industry manager parser.
         
         Args:
-            file_path: Optional path to the resume file
+            file_path: Path to the resume file
         """
-        super().__init__()
+        if file_path is None:
+            raise ValueError("File path must be provided")
+        super().__init__(file_path)
         self.file_path = file_path
     
     def parse(self, file_path: str = None) -> Dict[str, Any]:
         """Parse an industry manager resume file.
         
         Args:
-            file_path: Path to the resume file
+            file_path: Optional path to the resume file. If not provided, uses the path from initialization.
             
         Returns:
             Dictionary containing parsed resume data
         """
-        if file_path is None and self.file_path is None:
-            raise ValueError("File path must be provided either in constructor or in parse method")
-        file_path = file_path or self.file_path
+        if file_path:
+            self.file_path = file_path
         
         try:
             # Read document
-            doc = Document(file_path)
+            doc = Document(self.file_path)
             text = "\n".join([p.text for p in doc.paragraphs])
             
             # Extract information
@@ -171,28 +172,36 @@ class IndustryManagerParser(BaseParser):
         """Extract skills from text."""
         skills = set()
         
+        # Common industry manager skills to look for
+        industry_skills = [
+            'team management', 'staff training', 'customer service', 'operations management',
+            'inventory control', 'quality assurance', 'budget management', 'scheduling',
+            'leadership', 'food safety', 'cost control', 'vendor relations',
+            'performance management', 'customer satisfaction', 'revenue growth'
+        ]
+        
         # Extract skills from Profile section
         profile_match = re.search(r'Profile\n(.*?)(?:\n\n|\n[A-Z])', text, re.DOTALL)
         if profile_match:
-            profile_text = profile_match.group(1)
-            skill_indicators = [
-                'team player', 'leader', 'management', 'training', 'recruiting',
-                'customer service', 'sales', 'detail oriented', 'multi-tasker',
-                'food and beverage', 'staff training', 'upselling'
-            ]
-            for skill in skill_indicators:
-                if skill.lower() in profile_text.lower():
+            profile_text = profile_match.group(1).lower()
+            for skill in industry_skills:
+                if skill.lower() in profile_text:
                     skills.add(skill.title())
         
         # Extract skills from Skills & Abilities section
         skills_match = re.search(r'Skills & Abilities\n(.*?)(?:\n\n|Activities and Interests)', text, re.DOTALL)
         if skills_match:
-            skills_text = skills_match.group(1)
-            skill_list = [s.strip() for s in skills_text.split(',') if s.strip()]
-            skills.update(skill_list)
+            skills_text = skills_match.group(1).lower()
+            # Look for industry-specific skills
+            for skill in industry_skills:
+                if skill.lower() in skills_text:
+                    skills.add(skill.title())
+            # Add any additional skills mentioned
+            additional_skills = [s.strip().title() for s in skills_text.split(',') if s.strip()]
+            skills.update(additional_skills)
         
-        return sorted(list(skills))[:5]  # Return top 5 skills as expected by models
-
+        return sorted(list(skills))[:5]  # Return top 5 skills
+    
     def _extract_achievements(self, text: str) -> List[str]:
         """Extract achievements from text."""
         achievements = []
@@ -200,25 +209,45 @@ class IndustryManagerParser(BaseParser):
         if len(experience_section) < 2:
             return achievements
         
-        experience_text = experience_section[1]
-        metric_patterns = [
-            r'(?:increased|decreased|reduced|improved|grew|achieved|exceeded|created|implemented|redesigned).*?(?:\d+%|\$\d+)',
-            r'(?:trained|managed|supervised|led|coordinated).*?(?:\d+\+?\s+(?:staff|employees|team members|people))',
-            r'(?:developed|launched|established|initiated).*?(?:program|system|process|initiative)'
+        experience_text = experience_section[1].lower()
+        
+        # Look for quantifiable achievements
+        achievement_patterns = [
+            r'increased (?:revenue|sales|profit) by (\d+)%',
+            r'reduced (?:costs|expenses|turnover) by (\d+)%',
+            r'improved (?:efficiency|productivity|satisfaction) by (\d+)%',
+            r'managed (?:team|staff) of (\d+)\+',
+            r'trained (?:over |more than )?(\d+) staff',
+            r'achieved (\d+)% (?:growth|increase|improvement)',
+            r'maintained (\d+)% (?:satisfaction|rating)'
         ]
         
-        for pattern in metric_patterns:
-            matches = re.finditer(pattern, experience_text, re.IGNORECASE)
+        for pattern in achievement_patterns:
+            matches = re.finditer(pattern, experience_text)
             for match in matches:
-                achievement = match.group(0).strip()
-                if achievement and achievement not in achievements:
-                    # Capitalize first letter and ensure proper punctuation
-                    achievement = achievement[0].upper() + achievement[1:]
-                    if not achievement.endswith('.'):
-                        achievement += '.'
-                    achievements.append(achievement)
+                # Convert the achievement to a proper sentence
+                full_match = match.group(0)
+                achievement = full_match[0].upper() + full_match[1:] + " through strategic initiatives"
+                achievements.append(achievement)
         
-        return achievements[:3]  # Return top 3 achievements as expected by models
+        # If no quantifiable achievements found, look for other significant achievements
+        if not achievements:
+            significant_phrases = [
+                'led', 'managed', 'implemented', 'developed', 'launched',
+                'improved', 'established', 'created', 'streamlined'
+            ]
+            for phrase in significant_phrases:
+                pattern = f'{phrase} [^.!?\n]+(?:[.!?\n]|$)'
+                matches = re.finditer(pattern, experience_text)
+                for match in matches:
+                    achievement = match.group(0).strip()
+                    if len(achievement) > 20:  # Only include substantial achievements
+                        achievement = achievement[0].upper() + achievement[1:]
+                        achievements.append(achievement)
+                if achievements:
+                    break
+        
+        return achievements[:3]  # Return top 3 achievements
 
 
 if __name__ == "__main__":

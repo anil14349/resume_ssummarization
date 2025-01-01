@@ -913,6 +913,73 @@ class ATSParser(BaseParser):
         ]
         return any(re.search(pattern, text, re.IGNORECASE) for pattern in date_role_patterns)
 
+    def _process_content(self, text_content: List[str]) -> None:
+        """Process the extracted text content.
+        
+        Args:
+            text_content: List of text lines from the document
+        """
+        try:
+            # Join all text for processing
+            full_text = '\n'.join(text_content)
+            
+            # Extract basic information
+            self.resume_data['name'] = self._extract_name(full_text)
+            self.resume_data['current_role'] = self._extract_role(full_text)
+            self.resume_data['skills'] = self._extract_skills(full_text)
+            self.resume_data['companies'] = self._extract_companies(full_text)
+            self.resume_data['years_experience'] = self._extract_years_experience(full_text)
+            
+            # Extract contact information
+            contact_info = self._extract_contact_info(full_text)
+            if contact_info:
+                self.resume_data['contact_info'] = contact_info
+                self.resume_data['email'] = contact_info.get('email', '')
+            
+            # Process achievements
+            doc = Document(self.file_path)
+            achievements = self._parse_achievements(doc)
+            if achievements:
+                self.resume_data['achievements'] = achievements
+            
+            # Extract education information
+            education_info = []
+            education_section = False
+            education_entry = {}
+            
+            for line in text_content:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                # Look for education section
+                if re.search(r'education|academic|qualification', line.lower()):
+                    education_section = True
+                    continue
+                
+                if education_section:
+                    # Look for degree information
+                    degree_match = re.search(r"(?:Bachelor's|Master's|PhD|B\.[A-Z]|M\.[A-Z]|Ph\.D)\s+(?:of|in|degree in)?\s+([^\n]+)", line)
+                    if degree_match:
+                        education_entry['degree'] = degree_match.group(0).strip()
+                        
+                    # Look for institution
+                    institution_match = re.search(r"([A-Z][A-Za-z\s]+(?:University|College|Institute))", line)
+                    if institution_match:
+                        education_entry['institution'] = institution_match.group(1).strip()
+                        
+                    # If we have both degree and institution, add to list
+                    if education_entry.get('degree') and education_entry.get('institution'):
+                        education_info.append(education_entry.copy())
+                        education_entry = {}
+                        
+            if education_info:
+                self.resume_data['education'] = education_info
+                
+        except Exception as e:
+            logger.error(f"Error processing content: {str(e)}")
+            raise
+
 # Example usage
 if __name__ == "__main__":
     file_path = 'src/templates/ATS classic HR resume.docx'
