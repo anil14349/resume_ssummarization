@@ -1,163 +1,138 @@
 # Resume Video Script Generator
 
-A powerful tool that generates engaging video scripts from resume templates using GPT-2 and modern web technologies.
-
-## System Architecture
-
-```mermaid
-graph TD
-    User[User] --> |Upload Resume| UI[Streamlit UI]
-    UI --> |HTTP Request| API[FastAPI Backend]
-    API --> |Parse Resume| P1[ATS Parser]
-    API --> |Parse Resume| P2[Industry Parser]
-    P1 --> |Structured Data| M[GPT-2 Model]
-    P2 --> |Structured Data| M
-    M --> |Generated Script| API
-    API --> |Response| UI
-    User --> |View Script| UI
-    
-    %% Monitoring Flow
-    API --> |Metrics| PR[Prometheus]
-    PR --> |Data| G[Grafana]
-    G --> |Dashboard| Admin[Admin]
-
-    %% Styling
-    classDef primary fill:#2374ab,stroke:#2374ab,stroke-width:2px,color:#fff
-    classDef secondary fill:#ff7e67,stroke:#ff7e67,stroke-width:2px,color:#fff
-    classDef monitoring fill:#57a773,stroke:#57a773,stroke-width:2px,color:#fff
-    
-    class User,Admin secondary
-    class UI,API,M primary
-    class PR,G monitoring
-```
+A powerful tool that generates engaging video scripts from resume templates using GPT-2 and modern web technologies. The system supports multiple industries including IT, Restaurant Management, and Healthcare.
 
 ## Features
 
-- **Two Resume Templates**
-  - ATS/HR Resume: Optimized for HR and recruitment positions
-  - Industry Manager Resume: Tailored for industry management roles
+- **Multi-Industry Support**
+  - IT/Software Development: Optimized for technical roles and skills
+  - Restaurant Management: Tailored for hospitality and food service
+  - Healthcare: Specialized for healthcare professionals
+
+- **Intelligent Script Generation**
+  - Industry-specific templates and prompts
+  - Dynamic content adaptation based on skills and experience
+  - Professional tone and structure
 
 - **Modern Web Interface**
   - Streamlit-based UI for easy interaction
   - Real-time script generation
-  - Download generated scripts
+  - User-friendly file upload
 
 - **Robust Backend**
   - FastAPI for high-performance API
-  - GPT-2 model for natural language generation
-  - Specialized parsers for different resume formats
-
-- **Comprehensive Monitoring**
-  - Prometheus metrics collection
-  - Grafana dashboards
-  - Performance and error tracking
+  - GPT-2 model with custom prompt engineering
+  - Specialized resume parsers
 
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Kubernetes cluster (for production deployment)
 - Python 3.11+
+- Virtual environment (recommended)
 
-### Local Development
+### Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/resume-video-generator.git
-cd resume-video-generator
+git clone https://github.com/yourusername/tv3.git
+cd tv3
 ```
 
-2. Install dependencies:
+2. Create and activate virtual environment:
+```bash
+python -m venv env
+source env/bin/activate  # On Windows: .\env\Scripts\activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the services:
+### Running the Application
+
+1. Start the FastAPI backend:
 ```bash
-# Terminal 1: Run FastAPI
-python -m src.api.app
-
-# Terminal 2: Run Streamlit
-streamlit run src.ui.streamlit_app.py
+# Terminal 1
+cd /path/to/tv3
+./env/bin/python src/api/app.py
 ```
 
-### Docker Deployment
-
+2. Start the Streamlit frontend:
 ```bash
-# Build and run with Docker Compose
-docker-compose up --build
+# Terminal 2
+cd /path/to/tv3
+./env/bin/streamlit run src/ui/streamlit_app.py
 ```
 
-### Kubernetes Deployment
+3. Access the application:
+- Frontend UI: http://localhost:8501
+- API Documentation: http://localhost:8000/docs
 
-1. Deploy core services:
-```bash
-kubectl apply -f k8s/deployment.yml
-kubectl apply -f k8s/service.yml
-kubectl apply -f k8s/pvc.yml
-```
+### Using the Application
 
-2. Deploy monitoring stack:
-```bash
-kubectl apply -f k8s/prometheus-config.yml
-kubectl apply -f k8s/prometheus.yml
-kubectl apply -f k8s/grafana-config.yml
-kubectl apply -f k8s/grafana.yml
-```
+1. Open the Streamlit UI in your browser
+2. Upload a resume file (supported format: .docx, .txt)
+3. Select the industry type:
+   - IT/Software
+   - Restaurant Management
+   - Healthcare
+4. Click "Generate Script" to create the video script
+5. View and use the generated script
 
-## Usage Guide
-
-1. **Access the Application**
-   - Open http://localhost:8501 in your browser
-   - You'll see the Streamlit UI
-
-2. **Generate a Video Script**
-   - Select your resume template type (ATS/HR or Industry Manager)
-   - Upload your resume in .docx format
-   - Click "Generate Video Script"
-   - Review and download the generated script
-
-3. **Monitor the System**
-   - Access Grafana: http://localhost:3000
-   - Default credentials: admin/admin
-   - View pre-configured dashboards
-
-## Documentation
-
-- [Models](docs/models.md): Documentation for the GPT-2 model implementation
-- [Parsers](docs/parsers.md): Details about resume parsing components
-- [Monitoring](docs/monitoring.md): Guide to monitoring and metrics
-- [API Reference](docs/api.md): API endpoints and usage
-
-## Directory Structure
+## Project Structure
 
 ```
-resume-video-generator/
+tv3/
 ├── src/
-│   ├── api/          # FastAPI backend
-│   ├── ui/           # Streamlit frontend
-│   ├── models/       # ML models
-│   ├── parsers/      # Resume parsers
-│   └── templates/    # Resume templates
-├── k8s/              # Kubernetes configs
-├── docs/             # Documentation
-└── tests/            # Test files
+│   ├── api/                 # FastAPI backend
+│   │   └── app.py          # Main API endpoints
+│   ├── models/             # ML models
+│   │   └── generic_gpt2_model.py  # GPT-2 implementation
+│   ├── parsers/            # Resume parsers
+│   │   ├── resume_parser.py
+│   │   ├── ats_parser.py
+│   │   └── industry_manager_parser.py
+│   ├── templates/          # Resume templates
+│   └── ui/                 # Streamlit frontend
+│       └── streamlit_app.py
+├── docs/                   # Documentation
+└── requirements.txt        # Python dependencies
 ```
+
+## Implementation Details
+
+### GPT-2 Model Configuration
+- Base model: GPT-2
+- Custom prompt engineering for industry-specific content
+- Parameters:
+  - Max length: 800
+  - Min length: 300
+  - Temperature: 0.7
+  - Top-p: 0.9
+  - Top-k: 50
+  - Repetition penalty: 1.2
+
+### Script Generation Process
+1. Resume parsing and data extraction
+2. Industry detection based on role and skills
+3. Template selection and prompt construction
+4. GPT-2 text generation
+5. Post-processing and validation
+
+### Supported Industries
+Each industry has specialized templates for:
+- Introduction and background
+- Professional experience
+- Skills and expertise
+- Achievements
+- Goals and aspirations
+- Contact information
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch
-3. Make your changes
-4. Submit a pull request
+Contributions are welcome! Please read our contributing guidelines and submit pull requests to our repository.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- GPT-2 model from OpenAI
-- FastAPI for the backend framework
-- Streamlit for the UI framework
-- Prometheus and Grafana for monitoring
+This project is licensed under the MIT License - see the LICENSE file for details.
