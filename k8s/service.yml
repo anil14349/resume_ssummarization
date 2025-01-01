@@ -6,7 +6,12 @@ spec:
   selector:
     app: resume-summary
   ports:
-    - protocol: TCP
+    - name: api
+      protocol: TCP
       port: 80
       targetPort: 8000
+    - name: ui
+      protocol: TCP
+      port: 8501
+      targetPort: 8501
   type: LoadBalancer

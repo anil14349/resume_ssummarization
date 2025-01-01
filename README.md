@@ -1,171 +1,163 @@
-# Resume Summary Generator
+# Resume Video Script Generator
 
-A powerful application that generates professional summaries from resumes using advanced language models.
+A powerful tool that generates engaging video scripts from resume templates using GPT-2 and modern web technologies.
 
-## Architecture Diagram
+## System Architecture
+
 ```mermaid
 graph TD
-    subgraph Frontend
-        UI[Streamlit UI] --> |Upload DOCX| API
-        UI --> |Display| Sum[Summary]
-    end
+    User[User] --> |Upload Resume| UI[Streamlit UI]
+    UI --> |HTTP Request| API[FastAPI Backend]
+    API --> |Parse Resume| P1[ATS Parser]
+    API --> |Parse Resume| P2[Industry Parser]
+    P1 --> |Structured Data| M[GPT-2 Model]
+    P2 --> |Structured Data| M
+    M --> |Generated Script| API
+    API --> |Response| UI
+    User --> |View Script| UI
     
-    subgraph Backend
-        API[FastAPI Server] --> |Process| PF[Parser Factory]
-        API --> |Generate| MF[Model Factory]
-        
-        PF --> |Parse| P1[ATS Parser]
-        PF --> |Parse| P2[Industry Parser]
-        
-        MF --> |Generate| M1[GPT-2 Model]
-        MF --> |Generate| M2[T5 Model]
-        MF --> |Generate| M3[BART Model]
-        
-        P1 & P2 --> |Extracted Data| MF
-        M1 & M2 & M3 --> |Generated Summary| API
-    end
-    
-    API --> |Return| Sum
-```
+    %% Monitoring Flow
+    API --> |Metrics| PR[Prometheus]
+    PR --> |Data| G[Grafana]
+    G --> |Dashboard| Admin[Admin]
 
-## Flow Diagram
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant S as Streamlit UI
-    participant A as FastAPI
-    participant P as Parser
-    participant M as Model
+    %% Styling
+    classDef primary fill:#2374ab,stroke:#2374ab,stroke-width:2px,color:#fff
+    classDef secondary fill:#ff7e67,stroke:#ff7e67,stroke-width:2px,color:#fff
+    classDef monitoring fill:#57a773,stroke:#57a773,stroke-width:2px,color:#fff
     
-    U->>S: Upload Resume
-    S->>A: POST /generate-summary
-    A->>P: Extract Information
-    P-->>A: Parsed Data
-    A->>M: Generate Summary
-    M-->>A: Generated Summary
-    A-->>S: Return Summary
-    S-->>U: Display Summary
-    U->>S: Edit Summary
-    U->>S: Download Summary
+    class User,Admin secondary
+    class UI,API,M primary
+    class PR,G monitoring
 ```
 
 ## Features
 
-- 📄 Support for DOCX resume files
-- 🤖 Multiple AI models (GPT-2, T5, BART)
-- 🎯 Specialized parsers (ATS, Industry)
-- 🌐 RESTful API
-- 🖥️ User-friendly web interface
-- ✏️ Editable summaries
-- 💾 Download functionality
+- **Two Resume Templates**
+  - ATS/HR Resume: Optimized for HR and recruitment positions
+  - Industry Manager Resume: Tailored for industry management roles
+
+- **Modern Web Interface**
+  - Streamlit-based UI for easy interaction
+  - Real-time script generation
+  - Download generated scripts
+
+- **Robust Backend**
+  - FastAPI for high-performance API
+  - GPT-2 model for natural language generation
+  - Specialized parsers for different resume formats
+
+- **Comprehensive Monitoring**
+  - Prometheus metrics collection
+  - Grafana dashboards
+  - Performance and error tracking
 
 ## Quick Start
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/resume-summary.git
-   cd resume-summary
-   ```
+### Prerequisites
+- Docker and Docker Compose
+- Kubernetes cluster (for production deployment)
+- Python 3.11+
 
-2. **Using Docker:**
-   ```bash
-   docker build -t resume-summary .
-   docker run -p 8000:8000 -p 8501:8501 resume-summary
-   ```
+### Local Development
 
-3. **Manual Setup:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Run the applications:**
-   ```bash
-   # Start FastAPI server
-   uvicorn src.api.main:app --reload
-
-   # Start Streamlit app
-   streamlit run src/streamlit_app.py
-   ```
-
-## Usage
-
-1. Open the Streamlit interface at http://localhost:8501
-2. Upload a DOCX resume file
-3. Select model and parser type
-4. Click "Generate Summary"
-5. Edit the generated summary if needed
-6. Download the final summary
-
-## API Documentation
-
-The FastAPI server provides these endpoints:
-- `POST /generate-summary/`: Generate summary from resume
-- `GET /models`: List available models
-- `GET /parsers`: List available parsers
-- `GET /health`: Health check
-
-Detailed API documentation available at http://localhost:8000/docs
-
-## Project Structure
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/resume-video-generator.git
+cd resume-video-generator
 ```
-resume-summary/
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Run the services:
+```bash
+# Terminal 1: Run FastAPI
+python -m src.api.app
+
+# Terminal 2: Run Streamlit
+streamlit run src.ui.streamlit_app.py
+```
+
+### Docker Deployment
+
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
+```
+
+### Kubernetes Deployment
+
+1. Deploy core services:
+```bash
+kubectl apply -f k8s/deployment.yml
+kubectl apply -f k8s/service.yml
+kubectl apply -f k8s/pvc.yml
+```
+
+2. Deploy monitoring stack:
+```bash
+kubectl apply -f k8s/prometheus-config.yml
+kubectl apply -f k8s/prometheus.yml
+kubectl apply -f k8s/grafana-config.yml
+kubectl apply -f k8s/grafana.yml
+```
+
+## Usage Guide
+
+1. **Access the Application**
+   - Open http://localhost:8501 in your browser
+   - You'll see the Streamlit UI
+
+2. **Generate a Video Script**
+   - Select your resume template type (ATS/HR or Industry Manager)
+   - Upload your resume in .docx format
+   - Click "Generate Video Script"
+   - Review and download the generated script
+
+3. **Monitor the System**
+   - Access Grafana: http://localhost:3000
+   - Default credentials: admin/admin
+   - View pre-configured dashboards
+
+## Documentation
+
+- [Models](docs/models.md): Documentation for the GPT-2 model implementation
+- [Parsers](docs/parsers.md): Details about resume parsing components
+- [Monitoring](docs/monitoring.md): Guide to monitoring and metrics
+- [API Reference](docs/api.md): API endpoints and usage
+
+## Directory Structure
+
+```
+resume-video-generator/
 ├── src/
-│   ├── api/              # FastAPI application
-│   ├── models/           # AI models
-│   ├── parsers/          # Resume parsers
-│   ├── templates/        # Resume templates
-│   ├── utils/            # Utility functions
-│   ├── generate_summary.py
-│   └── streamlit_app.py
-├── docs/                 # Documentation
-├── tests/               # Test files
-├── Dockerfile          # Docker configuration
-├── requirements.txt    # Python dependencies
-└── README.md
+│   ├── api/          # FastAPI backend
+│   ├── ui/           # Streamlit frontend
+│   ├── models/       # ML models
+│   ├── parsers/      # Resume parsers
+│   └── templates/    # Resume templates
+├── k8s/              # Kubernetes configs
+├── docs/             # Documentation
+└── tests/            # Test files
 ```
-
-## Development
-
-### Testing
-```bash
-pytest tests/
-```
-
-### Code Style
-```bash
-flake8 src/
-```
-
-## Deployment
-
-The application can be deployed to various cloud platforms:
-- AWS ECS/EKS
-- Google Cloud Run
-- Azure Container Apps
 
 ## Contributing
 
 1. Fork the repository
 2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+3. Make your changes
+4. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Documentation
-
-- [Architecture Documentation](docs/architecture.md)
-- [API Documentation](docs/api.md)
-
-## Authors
-
-- Your Name - Initial work
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- OpenAI for GPT-2
-- Google for T5
-- Facebook for BART
+- GPT-2 model from OpenAI
+- FastAPI for the backend framework
+- Streamlit for the UI framework
+- Prometheus and Grafana for monitoring

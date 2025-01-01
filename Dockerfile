@@ -12,6 +12,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -31,18 +32,16 @@ USER appuser
 # Add src to Python path
 ENV PYTHONPATH=/app
 
-# Create a directory for templates if it doesn't exist
-RUN mkdir -p src/templates
+# Create necessary directories
+RUN mkdir -p src/templates src/models src/parsers
 
 # Expose ports for FastAPI and Streamlit
 EXPOSE 8000 8501
 
 # Create a script to run both services
 RUN echo '#!/bin/bash\n\
-cd /app && \
-uvicorn src.api.main:app --host 0.0.0.0 --port 8000 & \n\
-cd /app && \
-streamlit run src/streamlit_app.py --server.port 8501 --server.address 0.0.0.0\n\
+uvicorn src.api.app:app --host 0.0.0.0 --port 8000 & \n\
+streamlit run src/ui/streamlit_app.py --server.port 8501 --server.address 0.0.0.0\n\
 wait' > /app/start.sh && chmod +x /app/start.sh
 
 # Set the entrypoint

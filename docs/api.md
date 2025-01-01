@@ -1,121 +1,152 @@
 # API Documentation
 
+## Overview
+
+The Resume Video Script Generator API is built using FastAPI and provides endpoints for generating video scripts from resumes. The API supports different template types and includes monitoring endpoints.
+
+## Base URL
+
+```
+http://localhost:8000
+```
+
 ## Endpoints
 
-### Generate Summary
+### Generate Video Script
+
 ```http
-POST /generate-summary/
+POST /generate-script
 ```
 
-Generates a professional summary from a resume file.
+Generates a video script from an uploaded resume.
 
-**Parameters:**
-- `file`: Resume file (DOCX only)
-- `model_type`: Model to use (gpt2, t5, or bart)
-- `parser_type`: Parser to use (ats or industry)
-- `debug`: Enable debug logging (optional)
+#### Request
 
-**Response:**
+**Content-Type:** `multipart/form-data`
+
+| Parameter     | Type   | Required | Description                           |
+|--------------|--------|----------|---------------------------------------|
+| file         | File   | Yes      | Resume file in .docx format          |
+| template_type| String | Yes      | Template type ("ats" or "industry")  |
+
+#### Response
+
 ```json
 {
-    "filename": "example.docx",
-    "model_type": "gpt2",
-    "parser_type": "ats",
-    "summary": "Generated professional summary..."
+    "script": "Generated video script content",
+    "template_type": "ATS/HR or Industry Manager"
 }
 ```
 
-### List Models
-```http
-GET /models
-```
+#### Error Responses
 
-Lists available models for summary generation.
-
-**Response:**
 ```json
 {
-    "models": [
-        {
-            "id": "gpt2",
-            "name": "GPT-2",
-            "description": "OpenAI's GPT-2 model fine-tuned for resume summarization"
-        },
-        {
-            "id": "t5",
-            "name": "T5",
-            "description": "Google's T5 model fine-tuned for resume summarization"
-        },
-        {
-            "id": "bart",
-            "name": "BART",
-            "description": "Facebook's BART model fine-tuned for resume summarization"
-        }
-    ]
+    "detail": "Error message"
 }
 ```
 
-### List Parsers
+Common error codes:
+- `400`: Invalid template type or file format
+- `500`: Internal server error
+
+### Metrics
+
 ```http
-GET /parsers
+GET /metrics
 ```
 
-Lists available resume parsers.
+Returns Prometheus metrics in plain text format.
 
-**Response:**
-```json
-{
-    "parsers": [
-        {
-            "id": "ats",
-            "name": "ATS Parser",
-            "description": "Parser optimized for ATS formatted resumes"
-        },
-        {
-            "id": "industry",
-            "name": "Industry Parser",
-            "description": "Parser optimized for industry-specific resume formats"
-        }
-    ]
-}
+#### Response
+
+```
+# HELP resume_video_requests_total Total number of resume video script requests
+# TYPE resume_video_requests_total counter
+resume_video_requests_total{template_type="ats"} 24
+resume_video_requests_total{template_type="industry"} 18
+
+# HELP resume_video_processing_seconds Time spent processing resume video script requests
+# TYPE resume_video_processing_seconds histogram
+...
 ```
 
-### Health Check
-```http
-GET /health
+## Using the API
+
+### cURL Examples
+
+1. Generate Script (ATS Template):
+```bash
+curl -X POST "http://localhost:8000/generate-script" \
+     -H "accept: application/json" \
+     -H "Content-Type: multipart/form-data" \
+     -F "file=@resume.docx" \
+     -F "template_type=ats"
 ```
 
-Checks API health status.
-
-**Response:**
-```json
-{
-    "status": "healthy"
-}
+2. Get Metrics:
+```bash
+curl -X GET "http://localhost:8000/metrics"
 ```
+
+### Python Example
+
+```python
+import requests
+
+def generate_script(file_path, template_type):
+    url = "http://localhost:8000/generate-script"
+    
+    with open(file_path, "rb") as f:
+        files = {"file": f}
+        data = {"template_type": template_type}
+        
+        response = requests.post(url, files=files, data=data)
+        
+        if response.status_code == 200:
+            return response.json()["script"]
+        else:
+            raise Exception(f"Error: {response.json()['detail']}")
+
+# Usage
+script = generate_script("resume.docx", "ats")
+print(script)
+```
+
+## Rate Limiting
+
+- Default rate limit: 100 requests per minute per IP
+- Burst limit: 200 requests
 
 ## Error Handling
 
 The API uses standard HTTP status codes:
-- 200: Success
-- 400: Bad Request (invalid input)
-- 500: Internal Server Error
 
-Error responses include a detail message:
-```json
-{
-    "detail": "Error message describing the problem"
-}
-```
+| Status Code | Description                                   |
+|------------|-----------------------------------------------|
+| 200        | Successful request                            |
+| 400        | Bad request (invalid parameters)              |
+| 413        | File too large                                |
+| 422        | Validation error                              |
+| 429        | Too many requests                             |
+| 500        | Internal server error                         |
 
-## CORS
+## Best Practices
 
-The API supports Cross-Origin Resource Sharing (CORS) with the following configuration:
-- All origins allowed
-- All methods allowed
-- All headers allowed
-- Credentials supported
+1. **File Size**
+   - Maximum file size: 10MB
+   - Supported format: .docx only
 
-## Rate Limiting
+2. **Template Types**
+   - Use "ats" for ATS/HR template
+   - Use "industry" for Industry Manager template
 
-Currently, no rate limiting is implemented. Consider adding rate limiting for production deployment.
+3. **Error Handling**
+   - Always check response status codes
+   - Implement proper retry logic
+   - Handle rate limiting gracefully
+
+4. **Monitoring**
+   - Monitor /metrics endpoint
+   - Track error rates and processing times
+   - Set up alerts for high error rates

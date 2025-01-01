@@ -1,12 +1,12 @@
 # Models Documentation
 
-## GPT2ResumeModel
+## GenericGPT2Model
 
-The `GPT2ResumeModel` class implements the GPT-2 based resume summarization model.
+The `GenericGPT2Model` class is responsible for generating video scripts from parsed resume data using GPT-2.
 
 ### Class Definition
 ```python
-class GPT2ResumeModel(BaseResumeModel):
+class GenericGPT2Model:
     def __init__(self, model_name="gpt2", device="cpu"):
         """Initialize GPT2 model with specified configuration.
         
@@ -20,14 +20,20 @@ class GPT2ResumeModel(BaseResumeModel):
 
 #### generate_summary
 ```python
-def generate_summary(self, text: str) -> str:
-    """Generate a resume summary from input text.
+def generate_summary(self, resume_data: Dict) -> str:
+    """Generate a video script from parsed resume data.
     
     Args:
-        text (str): Input resume text
+        resume_data (Dict): Parsed resume data containing sections like:
+            - name (str): Full name
+            - current_role (str): Current job title
+            - skills (List[str]): List of skills
+            - experience (List[Dict]): Work experience
+            - education (List[Dict]): Educational background
+            - achievements (List[str]): Notable achievements
         
     Returns:
-        str: Generated summary
+        str: Generated video script
         
     Raises:
         ModelError: If generation fails
@@ -37,62 +43,50 @@ def generate_summary(self, text: str) -> str:
 #### preprocess_text
 ```python
 def preprocess_text(self, text: str) -> str:
-    """Clean and format input text.
+    """Clean and format input text for the model.
     
     Args:
         text (str): Raw input text
         
     Returns:
-        str: Preprocessed text
+        str: Preprocessed text ready for model input
     """
 ```
 
-## EnhancedModelFactory
-
-The `EnhancedModelFactory` class manages the creation and enhancement of language models.
-
-### Class Definition
+#### postprocess_output
 ```python
-class EnhancedModelFactory:
-    def __init__(
-        self,
-        model_type: str,
-        cleanup_enhancer: Optional[MLCleanupEnhancer] = None,
-        config: Optional[Dict] = None
-    ):
-        """Initialize model factory.
-        
-        Args:
-            model_type (str): Type of model to create ('gpt2', 't5', 'bart')
-            cleanup_enhancer (Optional[MLCleanupEnhancer]): ML cleanup system
-            config (Optional[Dict]): Model configuration
-        """
-```
-
-### Key Methods
-
-#### create_model
-```python
-def create_model(self) -> BaseResumeModel:
-    """Create and return a configured model instance.
-    
-    Returns:
-        BaseResumeModel: Configured model instance
-        
-    Raises:
-        ValueError: If model_type is invalid
-    """
-```
-
-#### add_enhancement
-```python
-def add_enhancement(self, enhancement_type: str):
-    """Add specified enhancement to model.
+def postprocess_output(self, output: str) -> str:
+    """Clean and format model output into a well-structured video script.
     
     Args:
-        enhancement_type (str): Type of enhancement to add
+        output (str): Raw model output
         
-    Raises:
-        ValueError: If enhancement_type is invalid
+    Returns:
+        str: Formatted video script
     """
 ```
+
+### Usage Example
+
+```python
+# Initialize model
+model = GenericGPT2Model()
+
+# Example resume data
+resume_data = {
+    'name': 'John Doe',
+    'current_role': 'Senior Software Engineer',
+    'skills': ['Python', 'Machine Learning', 'Leadership'],
+    'achievements': ['Led team of 5 engineers', 'Reduced costs by 40%']
+}
+
+# Generate video script
+script = model.generate_summary(resume_data)
+```
+
+## Integration
+
+The model is integrated with:
+1. FastAPI backend for HTTP API access
+2. Streamlit UI for interactive usage
+3. ATSParser and IndustryManagerParser for resume data extraction
