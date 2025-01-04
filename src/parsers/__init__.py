@@ -1,3 +1,4 @@
-from .resume_parser import ResumeParser
+from .ats_parser import ATSParser
+from .industry_manager_parser import IndustryManagerParser
 
-__all__ = ['ResumeParser']
+__all__ = ['ATSParser', 'IndustryManagerParser']
