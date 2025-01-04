@@ -148,12 +148,11 @@ graph TB
 
     subgraph Storage
         Files[File Storage]
-        Templates[Template Storage]
     end
 
     UI --> |HTTP/REST| API
     Upload --> Files
-    Template --> Templates
+    Template --> |Parameter| API
     API --> Parser
     Parser --> Model
     Model --> Cache
